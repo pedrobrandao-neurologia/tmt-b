@@ -3,10 +3,10 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>Trail Making Test B (TMT-B) — Versão Aprimorada</title>
+<title>Trail Making Test B (TMT-B) — Versão 3.3.1</title>
 <meta name="description" content="Implementação digital do TMT-B para avaliação de flexibilidade cognitiva e atenção alternada, com registro completo e exportação de dados."/>
 <meta name="author" content="Laboratório de Neurociência Cognitiva"/>
-<meta name="version" content="3.2.0"/>
+<meta name="version" content="3.3.1"/>
 
 <style>
 :root{
@@ -123,7 +123,7 @@ kbd{background:#eee;border-radius:6px;border:1px solid #ddd;padding:.1rem .35rem
 
     <div class="instructions" id="instructions">
       <h3>📋 Como executar</h3>
-      <p>Toque/clique alternando <strong>números</strong> e <strong>letras</strong> em ordem crescente: <strong>1 → A → 2 → B → 3 → C</strong> … até <strong>13 → L</strong>.
+      <p>Toque/clique alternando <strong>números</strong> e <strong>letras</strong> em ordem crescente: <strong>1 → A → 2 → B → 3 → C</strong> … até <strong>12 → L → 13</strong>.
       Faça o mais rápido possível e sem erros. Em caso de erro, <em>o tempo continua</em> e será necessário selecionar o item correto para avançar.</p>
       <p style="margin-top:.5rem">Recomenda-se ambiente silencioso, tela em modo paisagem (se possível) e uma tentativa de treino antes do teste principal.</p>
     </div>
@@ -202,7 +202,6 @@ kbd{background:#eee;border-radius:6px;border:1px solid #ddd;padding:.1rem .35rem
 /* ===== Utilidades ===== */
 const qs = s => document.querySelector(s);
 const qsa = s => Array.from(document.querySelectorAll(s));
-const clamp = (x,a,b)=>Math.max(a,Math.min(b,x));
 
 /* RNG com semente (Mulberry32) para reprodutibilidade */
 function seededRand(seed){
@@ -217,18 +216,19 @@ function seededRand(seed){
 function getSeed(){
   const u = new URL(String(window.location));
   const s = u.searchParams.get("seed") || (u.hash||"").replace("#","").split("=")[1];
-  return isNaN(+s) ? null : +s;
+  const n = parseInt(s, 10);
+  return isNaN(n) ? null : n;
 }
 
 /* ===== Teste TMT-B ===== */
 class TMTB {
   constructor(){
     this.cfg = {
-      PRACTICE_PAIRS: 4,     // 1-A a 4-D
-      FULL_PAIRS: 12,        // 1-A a 12-L + 13
+      PRACTICE_PAIRS: 4,      // 1-A a 4-D
+      FULL_PAIRS: 12,         // 1-A a 12-L + 13
       MAX_TIME_MS: 5*60*1000,
-      MIN_DIST: null,        // definido via CSS em px
-      MARGIN: 52,            // margem interna da área
+      MIN_DIST: null,         // definido via CSS em px
+      MARGIN: 52,             // margem interna da área
       COUNTDOWN: 3
     };
     this.el = this.bindElements();
@@ -268,14 +268,11 @@ class TMTB {
     this.el.btnCSV.addEventListener('click', ()=>this.exportCSV());
     this.el.btnJSON.addEventListener('click', ()=>this.exportJSON());
     this.el.btnLOG.addEventListener('click', ()=>this.exportLogCSV());
-    // evitar espaço rolar página durante teste
     window.addEventListener('keydown', e=>{
       if(this.state?.isRunning && (e.key===' '||e.key==='Spacebar')) e.preventDefault();
     });
-    // foco visível nos nós via teclado
     this.el.stage.addEventListener('keydown', e=>{
       if(!this.state?.isRunning) return;
-      // sem navegação por teclado para prevenir “atalhos” — apenas clique/toque
       if(['Enter',' '].includes(e.key)) e.preventDefault();
     });
   }
@@ -337,8 +334,9 @@ class TMTB {
     this.el.btnPractice.disabled=true;
     this.el.btnStart.disabled=true;
     this.message('Aquecimento: prepare-se…','info');
-    this.placeNodes();
-    this.countdown(()=>{ this.startTimer(); this.el.root.classList.add('test-on'); });
+    if(this.placeNodes()){
+        this.countdown(()=>{ this.startTimer(); this.el.root.classList.add('test-on'); });
+    }
   }
 
   startTest(){
@@ -349,8 +347,9 @@ class TMTB {
     this.state.seq = this.seqFull;
     this.el.btnStart.style.display='none';
     this.message('Teste principal: prepare-se…','info');
-    this.placeNodes();
-    this.countdown(()=>{ this.startTimer(); this.el.root.classList.add('test-on'); });
+    if(this.placeNodes()){
+        this.countdown(()=>{ this.startTimer(); this.el.root.classList.add('test-on'); });
+    }
   }
 
   countdown(cb){
@@ -367,35 +366,77 @@ class TMTB {
     },1000);
   }
 
-  placeNodes(){
-    this.clearStage();
-    this.state.nodes=[]; this.state.pos=[]; this.state.current=0; this.state.totalDist=0;
+  /**
+   * BUGFIX-1: Refatoração da função placeNodes
+   * A versão original usava uma chamada recursiva (this.placeNodes()) para tentar novamente
+   * a distribuição dos alvos em caso de falha. Isso podia levar a um estouro de pilha
+   * (stack overflow) e travar o navegador se a tela fosse pequena demais para os alvos,
+   * impedindo o início do teste.
+   *
+   * A nova versão usa um loop 'while' para tentar a distribuição completa por até 10 vezes.
+   * Se falhar, exibe uma mensagem de erro clara para o usuário sem travar.
+   * Isso torna o início do teste muito mais robusto e confiável.
+   */
+  placeNodes() {
     const r = this.el.stage.getBoundingClientRect();
-    const W=r.width, H=r.height, M=this.cfg.MARGIN, MIN=this.cfg.MIN_DIST;
-    let triesGlobal=0;
+    const W = r.width, H = r.height, M = this.cfg.MARGIN;
+    
+    let globalTries = 0;
+    const MAX_GLOBAL_TRIES = 10;
+    
+    while (globalTries < MAX_GLOBAL_TRIES) {
+      this.clearStage();
+      this.state.nodes = [];
+      this.state.pos = [];
+      this.state.current = 0;
+      this.state.totalDist = 0;
 
-    const rand = ()=> this.state.rng();
+      let allNodesPlaced = true;
+      let min_dist = this.cfg.MIN_DIST;
 
-    for(const item of this.state.seq){
-      let attempts=0, x=0,y=0, ok=false, min=MIN;
-      while(attempts<180){
-        x = M + rand()*(W-2*M);
-        y = M + rand()*(H-2*M);
-        if(this.state.pos.every(p => Math.hypot(x-p.x, y-p.y) >= min)){ ok=true; break; }
-        attempts++;
-        if(attempts%60===0) min = Math.max(48, min-6); // recuo adaptativo para garantir alocação
+      for (const item of this.state.seq) {
+        let attempts = 0, x = 0, y = 0, isOk = false;
+        
+        while (attempts < 200) {
+          x = M + this.state.rng() * (W - 2 * M);
+          y = M + this.state.rng() * (H - 2 * M);
+          if (this.state.pos.every(p => Math.hypot(x - p.x, y - p.y) >= min_dist)) {
+            isOk = true;
+            break;
+          }
+          attempts++;
+          // A cada 60 tentativas, reduz um pouco a distância para facilitar o encaixe
+          if (attempts % 60 === 0) min_dist = Math.max(48, min_dist - 6);
+        }
+
+        if (!isOk) {
+          allNodesPlaced = false;
+          break; // Falhou em posicionar este alvo, quebra o loop 'for'
+        }
+
+        this.state.pos.push({ x, y, item });
       }
-      if(!ok){ // falha rara: recomeça distribuição
-        if(++triesGlobal>3){ console.warn('Distribuição difícil — reduzindo distância mínima.'); }
-        return this.placeNodes();
+
+      if (allNodesPlaced) {
+        // Sucesso! Posiciona os nós no DOM e sai do loop 'while'
+        this.state.pos.forEach(p => {
+          const node = this.makeNode({ x: p.x, y: p.y, item: p.item });
+          this.el.stage.appendChild(node);
+          this.state.nodes.push({ node, item: p.item });
+        });
+        
+        this.computeOptimalDistance();
+        this.highlightTarget();
+        return true; // Retorna sucesso
       }
-      this.state.pos.push({x,y,item});
-      const node = this.makeNode({x,y,item});
-      this.el.stage.appendChild(node);
-      this.state.nodes.push({node,item});
+      
+      globalTries++;
     }
-    this.computeOptimalDistance();
-    this.highlightTarget();
+    
+    // Se o loop terminar sem sucesso
+    console.error(`Falha ao distribuir os alvos após ${MAX_GLOBAL_TRIES} tentativas.`);
+    this.message("Erro: Não foi possível gerar o teste. A tela pode ser pequena demais. Tente usar uma tela maior ou recarregar a página.", "err");
+    return false; // Retorna falha
   }
 
   makeNode({x,y,item}){
@@ -465,7 +506,7 @@ class TMTB {
   highlightTarget(){
     this.state.nodes.forEach(n=>n.node.classList.remove('target'));
     if(this.state.current < this.state.seq.length){
-      const tgt = this.state.nodes[this.state.current];
+      const tgt = this.state.nodes.find(n => n.item.v === this.state.seq[this.state.current].v);
       if(tgt) tgt.node.classList.add('target');
       this.uiSet(this.el.next, this.state.seq[this.state.current].v);
     }
@@ -487,7 +528,13 @@ class TMTB {
       this.uiSet(this.el.timer, `${String(mm).padStart(2,'0')}:${String(ss).padStart(2,'0')}`);
     }, 100);
   }
-  stopTimer(){ if(this.tIV) clearInterval(this.tIV); this.state.isRunning=false; }
+  stopTimer(){
+    if(this.tIV) clearInterval(this.tIV);
+    // BUGFIX-3: O estado (this.state) pode não existir na chamada inicial do construtor.
+    if (this.state) {
+        this.state.isRunning = false;
+    }
+  }
 
   finish(timeout){
     this.stopTimer();
@@ -511,10 +558,7 @@ class TMTB {
   computeResults(){
     const total = (this.state.end - this.state.start);
     const correctClicks = this.state.clicks.filter(c=>c.correct);
-    const times = [];
-    for(let i=1;i<correctClicks.length;i++){
-      times.push(correctClicks[i].ts - correctClicks[i-1].ts);
-    }
+    
     const sw=[], nsw=[];
     for(let i=1;i<correctClicks.length;i++){
       const prev=correctClicks[i-1], cur=correctClicks[i];
@@ -538,13 +582,22 @@ class TMTB {
     }
     const perseveration = this.state.errors.length? (E.regression/this.state.errors.length)*100 : 0;
 
-    // classificação heurística (ajuste conforme normas locais)
+    /**
+     * BUGFIX-2: Lógica de classificação
+     * A versão original usava uma série de 'if' independentes. Isso fazia com que um resultado
+     * fosse reclassificado múltiplas vezes (ex: um tempo de 100s seria "Médio", depois
+     * "Médio Baixo" e finalmente "Limítrofe").
+     * * A lógica foi alterada para uma estrutura 'if / else if', garantindo que cada
+     * resultado receba apenas uma classificação, a correta. A ordem foi invertida
+     * para que a verificação vá do mais severo para o mais brando.
+     */
     const tSec = total/1000;
-    let cls = "Superior";
-    if(tSec>36) cls="Médio";
-    if(tSec>78) cls="Médio Baixo";
-    if(tSec>90 || this.state.errors.length>5) cls="Limítrofe";
+    let cls;
     if(tSec>290 || this.state.errors.length>15) cls="Comprometido";
+    else if(tSec>90 || this.state.errors.length>5) cls="Limítrofe";
+    else if(tSec>78) cls="Médio Baixo";
+    else if(tSec>36) cls="Médio";
+    else cls = "Superior";
 
     this.results = {
       totalTimeMs: Math.round(total),
@@ -587,8 +640,9 @@ class TMTB {
       const dt = clicks[i].ts - clicks[i-1].ts;
       (clicks[i].item.t!==clicks[i-1].item.t ? sw : nsw).push(dt);
     }
+    const avg = arr => arr.length ? arr.reduce((a,b)=>a+b,0)/arr.length : 0;
     if(sw.length && nsw.length){
-      const m = Math.round(sw.reduce((a,b)=>a+b,0)/sw.length - nsw.reduce((a,b)=>a+b,0)/nsw.length);
+      const m = Math.round(avg(sw) - avg(nsw));
       this.uiSet(this.el.switch, `${m} ms`);
     }
   }
@@ -692,12 +746,8 @@ document.addEventListener('DOMContentLoaded', ()=>{
   window.addEventListener('keydown', (e)=>{
     if(e.key==='Escape'){ app.hideResults(); }
   });
-
-  // dicas visuais de foco
-  qsa('.btn').forEach(b=>b.addEventListener('keydown',e=>{
-    if(e.key==='Enter'||e.key===' ') e.preventDefault();
-  }));
 });
 </script>
 </body>
 </html>
+
