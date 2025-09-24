@@ -1,0 +1,743 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Trail Making Test B (TMT-B) - Versão Aprimorada</title>
+    <meta name="description" content="Implementação digital aprimorada do Trail Making Test Parte B para avaliação da flexibilidade cognitiva.">
+    <meta name="author" content="Laboratório de Neurociência Cognitiva">
+    <meta name="version" content="3.0.0">
+
+    <style>
+        :root {
+            --primary-color: #673AB7; /* Roxo para TMT-B */
+            --primary-dark: #512DA8;
+            --success-color: #4CAF50;
+            --error-color: #f44336;
+            --warning-color: #FF9800;
+            --info-color: #00BCD4;
+            --number-bg: #E3F2FD;
+            --letter-bg: #F1F8E9; /* Verde mais suave */
+            --number-border: #2196F3;
+            --letter-border: #8BC34A;
+            --bg-gradient-start: #f4f6f9;
+            --bg-gradient-end: #e9ecf1;
+            --text-primary: #212121;
+            --text-secondary: #666;
+            --border-color: #e0e0e0;
+            --shadow-sm: 0 2px 4px rgba(0,0,0,0.1);
+            --shadow-md: 0 4px 8px rgba(0,0,0,0.15);
+            --shadow-lg: 0 8px 16px rgba(0,0,0,0.2);
+            --border-radius: 12px;
+            --transition-speed: 0.3s;
+            --circle-size: 52px;
+            --min-distance: 80px;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            background: linear-gradient(135deg, var(--bg-gradient-start), var(--bg-gradient-end));
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 1rem;
+            color: var(--text-primary);
+        }
+        
+        .test-in-progress .stats-grid,
+        .test-in-progress .progress-bar {
+            visibility: hidden;
+            opacity: 0;
+        }
+        .test-in-progress .stat-card-timer {
+            visibility: visible !important;
+            opacity: 1 !important;
+        }
+
+        .container {
+            background: white;
+            border-radius: var(--border-radius);
+            box-shadow: var(--shadow-lg);
+            max-width: 1200px;
+            width: 100%;
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, var(--primary-color), var(--primary-dark));
+            color: white;
+            padding: 2rem;
+            text-align: center;
+        }
+
+        .header h1 { font-size: 2rem; font-weight: 600; margin-bottom: 0.5rem; text-shadow: 0 2px 4px rgba(0,0,0,0.2); }
+        .header p { font-size: 1.1rem; opacity: 0.95; }
+
+        .main-content { padding: 2rem; }
+
+        .phase-indicator { display: flex; justify-content: center; gap: 0.5rem; margin-bottom: 2rem; flex-wrap: wrap; }
+        .phase-dot {
+            width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
+            font-weight: bold; font-size: 0.9rem; background: #f5f5f5; color: var(--text-secondary);
+            position: relative; transition: all var(--transition-speed);
+        }
+        .phase-dot.active { background: var(--primary-color); color: white; transform: scale(1.1); box-shadow: 0 0 0 4px rgba(103, 58, 183, 0.2); }
+        .phase-dot.completed { background: var(--success-color); color: white; }
+        .phase-dot::after { content: attr(data-label); position: absolute; bottom: -20px; font-size: 0.75rem; white-space: nowrap; color: var(--text-secondary); }
+
+        .test-canvas {
+            width: 100%; max-width: 900px; height: 500px; border: 3px solid var(--border-color);
+            border-radius: var(--border-radius); position: relative; margin: 2rem auto;
+            background: #fafafa; overflow: hidden; box-shadow: inset 0 2px 8px rgba(0,0,0,0.05);
+        }
+
+        .countdown-overlay {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background-color: rgba(255, 255, 255, 0.8); display: flex; justify-content: center; align-items: center;
+            font-size: 8rem; font-weight: bold; color: var(--primary-color);
+            z-index: 100; backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px);
+        }
+
+        .circle-node {
+            position: absolute; width: var(--circle-size); height: var(--circle-size); border-radius: 50%;
+            border: 3px solid; display: flex; align-items: center; justify-content: center;
+            font-size: 1.25rem; font-weight: bold; cursor: pointer; user-select: none;
+            transition: all var(--transition-speed); z-index: 10; box-shadow: var(--shadow-sm);
+        }
+
+        .circle-node.number { background-color: var(--number-bg); border-color: var(--number-border); color: var(--number-border); }
+        .circle-node.letter { background-color: var(--letter-bg); border-color: var(--letter-border); color: var(--letter-border); }
+
+        .circle-node:hover { transform: scale(1.15); box-shadow: var(--shadow-md); z-index: 20; }
+        .circle-node.target { animation: pulse 1.5s infinite; }
+        .circle-node.target.number { border-color: var(--number-border); background: linear-gradient(135deg, rgba(33, 150, 243, 0.1), rgba(33, 150, 243, 0.05)); }
+        .circle-node.target.letter { border-color: var(--letter-border); background: linear-gradient(135deg, rgba(139, 195, 74, 0.1), rgba(139, 195, 74, 0.05)); }
+        
+        .circle-node.correct { background: var(--success-color); color: white; border-color: var(--success-color); transform: scale(0.95); pointer-events: none; }
+        .circle-node.error { animation: shake 0.5s; border-color: var(--error-color); }
+        
+        .trail-line { position: absolute; background: var(--success-color); height: 3px; transform-origin: left center; z-index: 5; pointer-events: none; }
+        
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(103, 58, 183, 0.4); }
+            50% { transform: scale(1.05); box-shadow: 0 0 0 10px rgba(103, 58, 183, 0); }
+        }
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            25% { transform: translateX(-8px); }
+            75% { transform: translateX(8px); }
+        }
+
+        .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1rem; margin: 2rem 0; transition: all var(--transition-speed); }
+        .stat-card { background: linear-gradient(135deg, #f5f5f5, #fafafa); padding: 1.25rem; border-radius: var(--border-radius); text-align: center; border: 1px solid var(--border-color); transition: all var(--transition-speed); }
+        .stat-card:hover { transform: translateY(-2px); box-shadow: var(--shadow-md); }
+        .stat-value { font-size: 2rem; font-weight: bold; color: var(--primary-color); margin-bottom: 0.25rem; }
+        .stat-label { color: var(--text-secondary); font-size: 0.85rem; text-transform: uppercase; letter-spacing: 1px; }
+
+        .controls { display: flex; gap: 1rem; justify-content: center; flex-wrap: wrap; margin: 2rem 0; }
+        .btn {
+            padding: 0.75rem 1.5rem; font-size: 1rem; font-weight: 600; border: none; border-radius: 8px; cursor: pointer;
+            transition: all var(--transition-speed); text-transform: uppercase; letter-spacing: 0.5px;
+            min-width: 150px; position: relative; overflow: hidden;
+        }
+        .btn::before { content: ''; position: absolute; top: 50%; left: 50%; width: 0; height: 0; border-radius: 50%; background: rgba(255, 255, 255, 0.3); transform: translate(-50%, -50%); transition: width 0.6s, height 0.6s; }
+        .btn:hover::before { width: 300px; height: 300px; }
+        .btn-primary { background: linear-gradient(135deg, var(--primary-color), var(--primary-dark)); color: white; box-shadow: var(--shadow-sm); }
+        .btn-primary:hover:not(:disabled) { transform: translateY(-2px); box-shadow: var(--shadow-md); }
+        .btn-secondary { background: white; color: var(--primary-color); border: 2px solid var(--primary-color); }
+        .btn-secondary:hover:not(:disabled) { background: var(--primary-color); color: white; }
+        .btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none !important; }
+        
+        .instructions-panel {
+            background: linear-gradient(135deg, rgba(103, 58, 183, 0.05), rgba(103, 58, 183, 0.02));
+            border-left: 4px solid var(--primary-color); padding: 1.5rem; border-radius: 8px; margin: 2rem 0; line-height: 1.6;
+        }
+        .instructions-panel h3 { color: var(--primary-color); margin-bottom: 1rem; font-size: 1.25rem; }
+        
+        .message-box { padding: 1rem; border-radius: 8px; margin: 1rem 0; text-align: center; font-weight: 500; transition: all var(--transition-speed); }
+        .message-info { background: rgba(0, 188, 212, 0.1); color: var(--info-color); border: 1px solid rgba(0, 188, 212, 0.3); }
+        .message-success { background: rgba(76, 175, 80, 0.1); color: var(--success-color); border: 1px solid rgba(76, 175, 80, 0.3); }
+        .message-warning { background: rgba(255, 152, 0, 0.1); color: var(--warning-color); border: 1px solid rgba(255, 152, 0, 0.3); }
+        .message-error { background: rgba(244, 67, 54, 0.1); color: var(--error-color); border: 1px solid rgba(244, 67, 54, 0.3); }
+
+        .progress-bar { width: 100%; height: 8px; background: var(--border-color); border-radius: 4px; overflow: hidden; margin: 1rem 0; transition: all var(--transition-speed); }
+        .progress-fill { height: 100%; background: linear-gradient(90deg, var(--primary-color), var(--success-color)); transition: width var(--transition-speed); width: 0%; }
+        
+        /* Modal Styles (similar to TMT-A) */
+        .modal {
+            display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0, 0, 0, 0.7); z-index: 1000; justify-content: center; align-items: center; animation: fadeIn 0.3s;
+        }
+        .modal.show { display: flex; }
+        .modal-content {
+            background: white; border-radius: var(--border-radius); padding: 2rem;
+            max-width: 800px; width: 90%; max-height: 90vh; overflow-y: auto;
+            box-shadow: var(--shadow-lg); animation: slideUp 0.3s;
+        }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        @keyframes slideUp { from { transform: translateY(50px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+        .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; padding-bottom: 1rem; border-bottom: 2px solid var(--border-color); }
+        .modal-header h2 { color: var(--primary-color); font-size: 1.5rem; }
+        .modal-close { background: none; border: none; font-size: 1.5rem; cursor: pointer; color: var(--text-secondary); transition: color var(--transition-speed); }
+        .modal-close:hover { color: var(--error-color); }
+        .results-section { margin: 1.5rem 0; padding: 1rem; background: #fafafa; border-radius: 8px; }
+        .results-section h3 { color: var(--primary-dark); margin-bottom: 1rem; font-size: 1.1rem; }
+        .results-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; }
+        .result-item { padding: 0.75rem; background: white; border-radius: 6px; border: 1px solid var(--border-color); }
+        .result-label { font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 0.25rem; }
+        .result-value { font-size: 1.25rem; font-weight: bold; color: var(--primary-color); }
+        .export-buttons { display: flex; gap: 1rem; justify-content: center; margin-top: 2rem; flex-wrap: wrap; }
+
+        @media (max-width: 768px) {
+            .header h1 { font-size: 1.5rem; }
+            .test-canvas { height: 400px; }
+            .stats-grid { grid-template-columns: repeat(2, 1fr); }
+            :root { --circle-size: 46px; --min-distance: 70px; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container" id="container">
+        <header class="header">
+            <h1>Teste de Trilhas - Parte B (TMT-B)</h1>
+            <p>Avaliação da Flexibilidade Cognitiva e Controle Executivo</p>
+        </header>
+
+        <main class="main-content">
+            <div class="phase-indicator">
+                <div class="phase-dot" id="phase-1" data-label="Instruções">1</div>
+                <div class="phase-dot" id="phase-2" data-label="Aquecimento">2</div>
+                <div class="phase-dot" id="phase-3" data-label="Teste">3</div>
+                <div class="phase-dot" id="phase-4" data-label="Resultados">4</div>
+            </div>
+
+            <div class="instructions-panel" id="instructions">
+                <h3>📋 Como Realizar o Teste</h3>
+                <p>
+                    Sua tarefa é clicar nos círculos alternando entre **números** e **letras**, em ordem crescente. A sequência correta é: <strong>1 → A → 2 → B → 3 → C</strong> e assim por diante, até o último item.
+                    <br><br>
+                    Tente fazer isso o mais rápido que puder, sem cometer erros. Vamos começar com um pequeno aquecimento.
+                </p>
+            </div>
+
+            <div class="progress-bar">
+                <div class="progress-fill" id="progress"></div>
+            </div>
+
+            <div class="test-canvas" id="testCanvas"></div>
+
+            <div class="stats-grid">
+                <div class="stat-card stat-card-timer">
+                    <div class="stat-value" id="timer">00:00</div>
+                    <div class="stat-label">Tempo</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="current">1</div>
+                    <div class="stat-label">Próximo</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="errors">0</div>
+                    <div class="stat-label">Erros</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="switch-cost">-</div>
+                    <div class="stat-label">Custo de Alternância</div>
+                </div>
+            </div>
+
+            <div class="message-box message-info" id="message">
+                Bem-vindo! Clique em "Começar Aquecimento" para praticar.
+            </div>
+
+            <div class="controls">
+                <button class="btn btn-secondary" id="practiceBtn">Começar Aquecimento</button>
+                <button class="btn btn-primary" id="startBtn" disabled>Começar Teste Principal</button>
+                <button class="btn btn-secondary" id="resultsBtn" style="display:none;">Ver Resultados</button>
+                <button class="btn btn-secondary" id="resetBtn">Reiniciar</button>
+            </div>
+        </main>
+    </div>
+
+    <div class="modal" id="resultsModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>📊 Relatório de Resultados - TMT-B</h2>
+                <button class="modal-close" id="closeModal">&times;</button>
+            </div>
+            <div class="results-section">
+                <h3>Desempenho Geral</h3>
+                <div class="results-grid">
+                    <div class="result-item"><div class="result-label">Tempo Total</div><div class="result-value" id="result-time">-</div></div>
+                    <div class="result-item"><div class="result-label">Total de Erros</div><div class="result-value" id="result-errors">-</div></div>
+                    <div class="result-item"><div class="result-label">Precisão</div><div class="result-value" id="result-accuracy">-</div></div>
+                    <div class="result-item"><div class="result-label">Classificação</div><div class="result-value" id="result-performance">-</div></div>
+                </div>
+            </div>
+            <div class="results-section">
+                <h3>Análise de Flexibilidade Cognitiva</h3>
+                <div class="results-grid">
+                    <div class="result-item"><div class="result-label">Custo de Alternância</div><div class="result-value" id="result-switch-cost">-</div></div>
+                    <div class="result-item"><div class="result-label">Tempo Médio (Alternância)</div><div class="result-value" id="result-avg-switch">-</div></div>
+                    <div class="result-item"><div class="result-label">Tempo Médio (Não Alternância)</div><div class="result-value" id="result-avg-non-switch">-</div></div>
+                    <div class="result-item"><div class="result-label">Eficiência Espacial</div><div class="result-value" id="result-efficiency">-</div></div>
+                </div>
+            </div>
+            <div class="results-section">
+                <h3>Análise de Erros</h3>
+                <div class="results-grid">
+                    <div class="result-item"><div class="result-label">Erros de Categoria</div><div class="result-value" id="error-category">-</div></div>
+                    <div class="result-item"><div class="result-label">Erros de Sequência</div><div class="result-value" id="error-sequence">-</div></div>
+                    <div class="result-item"><div class="result-label">Erros de Regressão</div><div class="result-value" id="error-regression">-</div></div>
+                    <div class="result-item"><div class="result-label">Índice de Perseveração</div><div class="result-value" id="error-perseveration">-</div></div>
+                </div>
+            </div>
+            <div class="export-buttons">
+                <button class="btn btn-primary" id="exportCSV">📥 Exportar CSV</button>
+                <button class="btn btn-primary" id="exportJSON">📥 Exportar JSON</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+    class TMTBTest {
+        constructor() {
+            this.initializeConfig();
+            this.initializeElements();
+            this.bindEvents();
+            this.reset();
+        }
+
+        initializeConfig() {
+            this.config = {
+                PRACTICE_PAIRS: 4, // 1-A to 4-D
+                FULL_PAIRS: 12, // 1-A to 12-L, plus final 13
+                MAX_TIME: 300000, // 5 minutos
+            };
+
+            this.fullSequence = this.generateSequence(this.config.FULL_PAIRS);
+            this.practiceSequence = this.generateSequence(this.config.PRACTICE_PAIRS);
+        }
+
+        generateSequence(pairs) {
+            const sequence = [];
+            for (let i = 1; i <= pairs; i++) {
+                sequence.push({ value: i.toString(), type: 'number' });
+                sequence.push({ value: String.fromCharCode(64 + i), type: 'letter' });
+            }
+            if (pairs === this.config.FULL_PAIRS) {
+                sequence.push({ value: (pairs + 1).toString(), type: 'number' });
+            }
+            return sequence;
+        }
+
+        initializeElements() {
+            this.container = document.getElementById('container');
+            this.canvas = document.getElementById('testCanvas');
+            this.timerDisplay = document.getElementById('timer');
+            this.currentDisplay = document.getElementById('current');
+            this.errorsDisplay = document.getElementById('errors');
+            this.switchCostDisplay = document.getElementById('switch-cost');
+            this.progressFill = document.getElementById('progress');
+            this.messageBox = document.getElementById('message');
+            
+            this.practiceBtn = document.getElementById('practiceBtn');
+            this.startBtn = document.getElementById('startBtn');
+            this.resultsBtn = document.getElementById('resultsBtn');
+            this.resetBtn = document.getElementById('resetBtn');
+
+            this.modal = document.getElementById('resultsModal');
+            this.closeModalBtn = document.getElementById('closeModal');
+            this.exportCSVBtn = document.getElementById('exportCSV');
+            this.exportJSONBtn = document.getElementById('exportJSON');
+
+            this.phases = {
+                1: document.getElementById('phase-1'), 2: document.getElementById('phase-2'),
+                3: document.getElementById('phase-3'), 4: document.getElementById('phase-4')
+            };
+        }
+
+        bindEvents() {
+            this.practiceBtn.addEventListener('click', () => this.startPractice());
+            this.startBtn.addEventListener('click', () => this.startTest());
+            this.resultsBtn.addEventListener('click', () => this.showModal());
+            this.resetBtn.addEventListener('click', () => this.reset());
+            this.closeModalBtn.addEventListener('click', () => this.hideModal());
+            this.exportCSVBtn.addEventListener('click', () => this.exportToCSV());
+            this.exportJSONBtn.addEventListener('click', () => this.exportToJSON());
+        }
+
+        reset(fullReset = true) {
+            this.stopTimer();
+            this.clearCanvas();
+            this.container.classList.remove('test-in-progress');
+            this.initializeState();
+            
+            if (fullReset) {
+                this.updatePhase(1);
+                this.practiceBtn.style.display = 'inline-block';
+                this.startBtn.style.display = 'inline-block';
+                this.startBtn.disabled = true;
+                this.resultsBtn.style.display = 'none';
+
+                this.timerDisplay.textContent = '00:00';
+                this.currentDisplay.textContent = '1';
+                this.errorsDisplay.textContent = '0';
+                this.switchCostDisplay.textContent = '-';
+                this.progressFill.style.width = '0%';
+                
+                this.showMessage('Bem-vindo! Clique em "Começar Aquecimento" para praticar.', 'info');
+            }
+        }
+
+        initializeState() {
+            this.state = {
+                phase: 'instructions', isRunning: false, isPractice: false,
+                currentIndex: 0, startTime: null, endTime: null,
+                errors: [], clicks: [], nodes: [], positions: [],
+                totalDistance: 0, optimalDistance: 0
+            };
+        }
+
+        updatePhase(phaseNumber) {
+            Object.values(this.phases).forEach(p => p.classList.remove('active', 'completed'));
+            for (let i = 1; i < phaseNumber; i++) this.phases[i].classList.add('completed');
+            this.phases[phaseNumber].classList.add('active');
+        }
+
+        startPractice() {
+            this.updatePhase(2);
+            this.state.isPractice = true;
+            this.state.phase = 'practice';
+            this.currentSequence = this.practiceSequence;
+            this.showMessage('Prepare-se para o aquecimento...', 'info');
+            this.generateNodes();
+            this.practiceBtn.style.display = 'none';
+            this.startBtn.disabled = true;
+
+            this.showCountdown(() => {
+                this.container.classList.add('test-in-progress');
+                this.startTimer();
+            });
+        }
+        
+        startTest() {
+            this.updatePhase(3);
+            this.reset(false);
+            this.state.isPractice = false;
+            this.state.phase = 'test';
+            this.currentSequence = this.fullSequence;
+            this.showMessage('Prepare-se para o teste principal...', 'info');
+            this.generateNodes();
+            this.startBtn.style.display = 'none';
+
+            this.showCountdown(() => {
+                this.container.classList.add('test-in-progress');
+                this.startTimer();
+            });
+        }
+
+        showCountdown(callback) {
+            const overlay = document.createElement('div');
+            overlay.className = 'countdown-overlay';
+            this.canvas.appendChild(overlay);
+            let count = 3;
+            overlay.textContent = count;
+            const interval = setInterval(() => {
+                count--;
+                if (count > 0) overlay.textContent = count;
+                else if (count === 0) overlay.textContent = 'JÁ!';
+                else {
+                    clearInterval(interval);
+                    this.canvas.removeChild(overlay);
+                    callback();
+                }
+            }, 1000);
+        }
+
+        generateNodes() {
+            this.clearCanvas();
+            this.state.nodes = [];
+            this.state.positions = [];
+            const rect = this.canvas.getBoundingClientRect();
+            const margin = 50;
+            
+            this.currentSequence.forEach(item => {
+                let position, attempts = 0;
+                do {
+                    position = {
+                        x: Math.random() * (rect.width - 2 * margin) + margin,
+                        y: Math.random() * (rect.height - 2 * margin) + margin,
+                    };
+                    attempts++;
+                } while (this.isTooClose(position) && attempts < 100);
+                
+                this.state.positions.push({ ...position, item });
+                this.createNode(position, item);
+            });
+            this.calculateOptimalDistance();
+            this.highlightTarget();
+        }
+
+        isTooClose(newPos) {
+            const minDistance = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--min-distance'));
+            return this.state.positions.some(pos => Math.sqrt(Math.pow(newPos.x - pos.x, 2) + Math.pow(newPos.y - pos.y, 2)) < minDistance);
+        }
+
+        createNode(position, item) {
+            const node = document.createElement('div');
+            node.className = `circle-node ${item.type}`;
+            node.textContent = item.value;
+            node.style.left = (position.x - parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--circle-size')) / 2) + 'px';
+            node.style.top = (position.y - parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--circle-size')) / 2) + 'px';
+            node.addEventListener('click', () => this.handleNodeClick(item, node));
+            this.canvas.appendChild(node);
+            this.state.nodes.push({node, item});
+        }
+
+        handleNodeClick(item, node) {
+            if (!this.state.isRunning) return;
+            
+            const timestamp = performance.now();
+            const expectedItem = this.currentSequence[this.state.currentIndex];
+            const isCorrect = item.value === expectedItem.value && item.type === expectedItem.type;
+
+            this.state.clicks.push({ item, expectedItem, timestamp, isCorrect });
+
+            if (isCorrect) this.handleCorrectClick(node, timestamp);
+            else this.handleIncorrectClick(node, item, expectedItem, timestamp);
+        }
+
+        handleCorrectClick(node, timestamp) {
+            node.classList.add('correct');
+            if (this.state.currentIndex > 0) {
+                this.drawTrail(this.state.currentIndex - 1, this.state.currentIndex);
+                this.updateDistance(this.state.currentIndex - 1, this.state.currentIndex);
+            }
+            this.state.currentIndex++;
+
+            if (this.state.currentIndex >= this.currentSequence.length) {
+                this.completeTest();
+            } else {
+                this.highlightTarget();
+                this.updateProgress();
+            }
+        }
+
+        handleIncorrectClick(node, clickedItem, expectedItem, timestamp) {
+            node.classList.add('error');
+            setTimeout(() => node.classList.remove('error'), 500);
+            
+            this.state.errors.push({ clickedItem, expectedItem, timestamp });
+            this.errorsDisplay.textContent = this.state.errors.length;
+            this.showMessage(`Atenção! Por favor, clique em ${expectedItem.value}`, 'warning');
+        }
+
+        drawTrail(fromIndex, toIndex) {
+            const fromPos = this.state.positions[fromIndex];
+            const toPos = this.state.positions[toIndex];
+            const trail = document.createElement('div');
+            trail.className = 'trail-line';
+            const dx = toPos.x - fromPos.x;
+            const dy = toPos.y - fromPos.y;
+            const distance = Math.sqrt(dx*dx + dy*dy);
+            const angle = Math.atan2(dy, dx) * 180 / Math.PI;
+            trail.style.width = `${distance}px`;
+            trail.style.left = `${fromPos.x}px`;
+            trail.style.top = `${fromPos.y}px`;
+            trail.style.transform = `rotate(${angle}deg)`;
+            this.canvas.appendChild(trail);
+        }
+
+        updateDistance(fromIndex, toIndex) {
+            const fromPos = this.state.positions[fromIndex];
+            const toPos = this.state.positions[toIndex];
+            this.state.totalDistance += Math.sqrt(Math.pow(toPos.x - fromPos.x, 2) + Math.pow(toPos.y - fromPos.y, 2));
+        }
+
+        calculateOptimalDistance() {
+            this.state.optimalDistance = 0;
+            for (let i = 1; i < this.state.positions.length; i++) {
+                const prev = this.state.positions[i-1];
+                const curr = this.state.positions[i];
+                this.state.optimalDistance += Math.sqrt(Math.pow(curr.x - prev.x, 2) + Math.pow(curr.y - prev.y, 2));
+            }
+        }
+        
+        highlightTarget() {
+            this.state.nodes.forEach(({node, item}) => node.classList.remove('target'));
+            if (this.state.currentIndex < this.currentSequence.length) {
+                const target = this.state.nodes.find(n => n.item.value === this.currentSequence[this.state.currentIndex].value && n.item.type === this.currentSequence[this.state.currentIndex].type);
+                if (target) target.node.classList.add('target');
+                this.currentDisplay.textContent = this.currentSequence[this.state.currentIndex].value;
+            }
+        }
+        
+        updateProgress() {
+            const progress = (this.state.currentIndex / this.currentSequence.length) * 100;
+            this.progressFill.style.width = `${progress}%`;
+            this.calculateAndDisplaySwitchCost();
+        }
+
+        startTimer() {
+            this.state.isRunning = true;
+            this.state.startTime = performance.now();
+            this.timerInterval = setInterval(() => {
+                const elapsed = performance.now() - this.state.startTime;
+                if (elapsed > this.config.MAX_TIME) return this.completeTest(true);
+                const minutes = Math.floor(elapsed / 60000);
+                const seconds = Math.floor((elapsed % 60000) / 1000);
+                this.timerDisplay.textContent = `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+            }, 100);
+        }
+
+        stopTimer() {
+            if (this.timerInterval) clearInterval(this.timerInterval);
+            this.state.isRunning = false;
+        }
+
+        completeTest(timeout = false) {
+            this.stopTimer();
+            this.state.endTime = performance.now();
+            this.state.phase = 'completed';
+            this.container.classList.remove('test-in-progress');
+
+            if (this.state.isPractice) {
+                this.showMessage('Aquecimento concluído! Clique em "Começar Teste Principal".', 'success');
+                this.startBtn.disabled = false;
+            } else {
+                this.updatePhase(4);
+                this.calculateResults();
+                this.showMessage('Teste concluído com sucesso!', 'success');
+                this.resultsBtn.style.display = 'inline-block';
+                this.displayResultsInModal();
+                this.showModal();
+            }
+        }
+        
+        calculateResults() {
+            const totalTime = this.state.endTime - this.state.startTime;
+            const clicks = this.state.clicks.filter(c => c.isCorrect);
+            let switchTimes = [], nonSwitchTimes = [];
+
+            for (let i = 1; i < clicks.length; i++) {
+                const timeDiff = clicks[i].timestamp - clicks[i - 1].timestamp;
+                if (clicks[i].item.type !== clicks[i - 1].item.type) {
+                    switchTimes.push(timeDiff);
+                } else {
+                    nonSwitchTimes.push(timeDiff);
+                }
+            }
+
+            const avgSwitch = switchTimes.length ? switchTimes.reduce((a, b) => a + b, 0) / switchTimes.length : 0;
+            const avgNonSwitch = nonSwitchTimes.length ? nonSwitchTimes.reduce((a, b) => a + b, 0) / nonSwitchTimes.length : 0;
+            const switchCost = avgSwitch > 0 && avgNonSwitch > 0 ? avgSwitch - avgNonSwitch : 0;
+            const accuracy = this.state.clicks.length > 0 ? (this.state.clicks.filter(c => c.isCorrect).length / this.state.clicks.length) * 100 : 0;
+            const efficiency = this.state.optimalDistance > 0 ? (this.state.optimalDistance / this.state.totalDistance) * 100 : 0;
+            
+            // Error analysis
+            let errorTypes = { category: 0, sequence: 0, regression: 0 };
+            this.state.errors.forEach(err => {
+                if (err.clickedItem.type !== err.expectedItem.type) {
+                    errorTypes.category++;
+                } else {
+                    const clickedVal = parseInt(err.clickedItem.value) || err.clickedItem.value.charCodeAt(0);
+                    const expectedVal = parseInt(err.expectedItem.value) || err.expectedItem.value.charCodeAt(0);
+                    if (clickedVal < expectedVal) errorTypes.regression++;
+                    else errorTypes.sequence++;
+                }
+            });
+
+            this.results = {
+                totalTime, totalErrors: this.state.errors.length, accuracy,
+                switchCost, avgSwitch, avgNonSwitch, efficiency, errorTypes,
+                perseverationIndex: this.state.errors.length > 0 ? (errorTypes.regression / this.state.errors.length) * 100 : 0
+            };
+            this.results.performance = this.classifyPerformance(this.results);
+        }
+
+        classifyPerformance(res) {
+            const timeSec = res.totalTime / 1000;
+            if (timeSec > 290 || res.totalErrors > 15) return "Comprometido";
+            if (timeSec > 90 || res.totalErrors > 5) return "Limítrofe";
+            if (timeSec > 78) return "Médio Baixo";
+            if (timeSec > 36) return "Médio";
+            return "Superior";
+        }
+        
+        displayResultsInModal() {
+            document.getElementById('result-time').textContent = `${(this.results.totalTime / 1000).toFixed(2)}s`;
+            document.getElementById('result-errors').textContent = this.results.totalErrors;
+            document.getElementById('result-accuracy').textContent = `${this.results.accuracy.toFixed(1)}%`;
+            document.getElementById('result-performance').textContent = this.results.performance;
+            document.getElementById('result-switch-cost').textContent = `${this.results.switchCost.toFixed(0)}ms`;
+            document.getElementById('result-avg-switch').textContent = `${this.results.avgSwitch.toFixed(0)}ms`;
+            document.getElementById('result-avg-non-switch').textContent = `${this.results.avgNonSwitch.toFixed(0)}ms`;
+            document.getElementById('result-efficiency').textContent = `${this.results.efficiency.toFixed(1)}%`;
+            document.getElementById('error-category').textContent = this.results.errorTypes.category;
+            document.getElementById('error-sequence').textContent = this.results.errorTypes.sequence;
+            document.getElementById('error-regression').textContent = this.results.errorTypes.regression;
+            document.getElementById('error-perseveration').textContent = `${this.results.perseverationIndex.toFixed(1)}%`;
+        }
+        
+        calculateAndDisplaySwitchCost() {
+            const clicks = this.state.clicks.filter(c => c.isCorrect);
+            if (clicks.length < 2) return;
+            let switchTimes = [], nonSwitchTimes = [];
+            for (let i = 1; i < clicks.length; i++) {
+                const timeDiff = clicks[i].timestamp - clicks[i - 1].timestamp;
+                if (clicks[i].item.type !== clicks[i-1].item.type) switchTimes.push(timeDiff);
+                else nonSwitchTimes.push(timeDiff);
+            }
+            if (switchTimes.length > 0 && nonSwitchTimes.length > 0) {
+                const avgSwitch = switchTimes.reduce((a, b) => a + b, 0) / switchTimes.length;
+                const avgNonSwitch = nonSwitchTimes.reduce((a, b) => a + b, 0) / nonSwitchTimes.length;
+                this.switchCostDisplay.textContent = `${Math.round(avgSwitch - avgNonSwitch)} ms`;
+            }
+        }
+        
+        showMessage(text, type) {
+            this.messageBox.textContent = text;
+            this.messageBox.className = `message-box message-${type}`;
+        }
+        
+        clearCanvas() { this.canvas.innerHTML = ''; }
+        showModal() { this.modal.classList.add('show'); }
+        hideModal() { this.modal.classList.remove('show'); }
+        
+        exportToJSON() {
+            const dataStr = JSON.stringify({ metadata: { date: new Date().toISOString() }, results: this.results }, null, 2);
+            const blob = new Blob([dataStr], {type: "application/json"});
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `TMT-B_results_${Date.now()}.json`;
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+        
+        exportToCSV() {
+            let csvContent = "data:text/csv;charset=utf-8,";
+            csvContent += "Metrica,Valor\n";
+            Object.entries(this.results).forEach(([key, value]) => {
+                if (typeof value !== 'object') {
+                    csvContent += `${key},${value}\n`;
+                }
+            });
+            const encodedUri = encodeURI(csvContent);
+            const link = document.createElement("a");
+            link.setAttribute("href", encodedUri);
+            link.setAttribute("download", `TMT-B_summary_${Date.now()}.csv`);
+            document.body.appendChild(link);
+            link.click();
+        }
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+        new TMTBTest();
+    });
+    </script>
+</body>
+</html>
