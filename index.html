@@ -1,743 +1,703 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Trail Making Test B (TMT-B) - Versão Aprimorada</title>
-    <meta name="description" content="Implementação digital aprimorada do Trail Making Test Parte B para avaliação da flexibilidade cognitiva.">
-    <meta name="author" content="Laboratório de Neurociência Cognitiva">
-    <meta name="version" content="3.0.0">
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Trail Making Test B (TMT-B) — Versão Aprimorada</title>
+<meta name="description" content="Implementação digital do TMT-B para avaliação de flexibilidade cognitiva e atenção alternada, com registro completo e exportação de dados."/>
+<meta name="author" content="Laboratório de Neurociência Cognitiva"/>
+<meta name="version" content="3.2.0"/>
 
-    <style>
-        :root {
-            --primary-color: #673AB7; /* Roxo para TMT-B */
-            --primary-dark: #512DA8;
-            --success-color: #4CAF50;
-            --error-color: #f44336;
-            --warning-color: #FF9800;
-            --info-color: #00BCD4;
-            --number-bg: #E3F2FD;
-            --letter-bg: #F1F8E9; /* Verde mais suave */
-            --number-border: #2196F3;
-            --letter-border: #8BC34A;
-            --bg-gradient-start: #f4f6f9;
-            --bg-gradient-end: #e9ecf1;
-            --text-primary: #212121;
-            --text-secondary: #666;
-            --border-color: #e0e0e0;
-            --shadow-sm: 0 2px 4px rgba(0,0,0,0.1);
-            --shadow-md: 0 4px 8px rgba(0,0,0,0.15);
-            --shadow-lg: 0 8px 16px rgba(0,0,0,0.2);
-            --border-radius: 12px;
-            --transition-speed: 0.3s;
-            --circle-size: 52px;
-            --min-distance: 80px;
-        }
-
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
-            background: linear-gradient(135deg, var(--bg-gradient-start), var(--bg-gradient-end));
-            min-height: 100vh;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            padding: 1rem;
-            color: var(--text-primary);
-        }
-        
-        .test-in-progress .stats-grid,
-        .test-in-progress .progress-bar {
-            visibility: hidden;
-            opacity: 0;
-        }
-        .test-in-progress .stat-card-timer {
-            visibility: visible !important;
-            opacity: 1 !important;
-        }
-
-        .container {
-            background: white;
-            border-radius: var(--border-radius);
-            box-shadow: var(--shadow-lg);
-            max-width: 1200px;
-            width: 100%;
-            overflow: hidden;
-        }
-
-        .header {
-            background: linear-gradient(135deg, var(--primary-color), var(--primary-dark));
-            color: white;
-            padding: 2rem;
-            text-align: center;
-        }
-
-        .header h1 { font-size: 2rem; font-weight: 600; margin-bottom: 0.5rem; text-shadow: 0 2px 4px rgba(0,0,0,0.2); }
-        .header p { font-size: 1.1rem; opacity: 0.95; }
-
-        .main-content { padding: 2rem; }
-
-        .phase-indicator { display: flex; justify-content: center; gap: 0.5rem; margin-bottom: 2rem; flex-wrap: wrap; }
-        .phase-dot {
-            width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
-            font-weight: bold; font-size: 0.9rem; background: #f5f5f5; color: var(--text-secondary);
-            position: relative; transition: all var(--transition-speed);
-        }
-        .phase-dot.active { background: var(--primary-color); color: white; transform: scale(1.1); box-shadow: 0 0 0 4px rgba(103, 58, 183, 0.2); }
-        .phase-dot.completed { background: var(--success-color); color: white; }
-        .phase-dot::after { content: attr(data-label); position: absolute; bottom: -20px; font-size: 0.75rem; white-space: nowrap; color: var(--text-secondary); }
-
-        .test-canvas {
-            width: 100%; max-width: 900px; height: 500px; border: 3px solid var(--border-color);
-            border-radius: var(--border-radius); position: relative; margin: 2rem auto;
-            background: #fafafa; overflow: hidden; box-shadow: inset 0 2px 8px rgba(0,0,0,0.05);
-        }
-
-        .countdown-overlay {
-            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-            background-color: rgba(255, 255, 255, 0.8); display: flex; justify-content: center; align-items: center;
-            font-size: 8rem; font-weight: bold; color: var(--primary-color);
-            z-index: 100; backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px);
-        }
-
-        .circle-node {
-            position: absolute; width: var(--circle-size); height: var(--circle-size); border-radius: 50%;
-            border: 3px solid; display: flex; align-items: center; justify-content: center;
-            font-size: 1.25rem; font-weight: bold; cursor: pointer; user-select: none;
-            transition: all var(--transition-speed); z-index: 10; box-shadow: var(--shadow-sm);
-        }
-
-        .circle-node.number { background-color: var(--number-bg); border-color: var(--number-border); color: var(--number-border); }
-        .circle-node.letter { background-color: var(--letter-bg); border-color: var(--letter-border); color: var(--letter-border); }
-
-        .circle-node:hover { transform: scale(1.15); box-shadow: var(--shadow-md); z-index: 20; }
-        .circle-node.target { animation: pulse 1.5s infinite; }
-        .circle-node.target.number { border-color: var(--number-border); background: linear-gradient(135deg, rgba(33, 150, 243, 0.1), rgba(33, 150, 243, 0.05)); }
-        .circle-node.target.letter { border-color: var(--letter-border); background: linear-gradient(135deg, rgba(139, 195, 74, 0.1), rgba(139, 195, 74, 0.05)); }
-        
-        .circle-node.correct { background: var(--success-color); color: white; border-color: var(--success-color); transform: scale(0.95); pointer-events: none; }
-        .circle-node.error { animation: shake 0.5s; border-color: var(--error-color); }
-        
-        .trail-line { position: absolute; background: var(--success-color); height: 3px; transform-origin: left center; z-index: 5; pointer-events: none; }
-        
-        @keyframes pulse {
-            0%, 100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(103, 58, 183, 0.4); }
-            50% { transform: scale(1.05); box-shadow: 0 0 0 10px rgba(103, 58, 183, 0); }
-        }
-        @keyframes shake {
-            0%, 100% { transform: translateX(0); }
-            25% { transform: translateX(-8px); }
-            75% { transform: translateX(8px); }
-        }
-
-        .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1rem; margin: 2rem 0; transition: all var(--transition-speed); }
-        .stat-card { background: linear-gradient(135deg, #f5f5f5, #fafafa); padding: 1.25rem; border-radius: var(--border-radius); text-align: center; border: 1px solid var(--border-color); transition: all var(--transition-speed); }
-        .stat-card:hover { transform: translateY(-2px); box-shadow: var(--shadow-md); }
-        .stat-value { font-size: 2rem; font-weight: bold; color: var(--primary-color); margin-bottom: 0.25rem; }
-        .stat-label { color: var(--text-secondary); font-size: 0.85rem; text-transform: uppercase; letter-spacing: 1px; }
-
-        .controls { display: flex; gap: 1rem; justify-content: center; flex-wrap: wrap; margin: 2rem 0; }
-        .btn {
-            padding: 0.75rem 1.5rem; font-size: 1rem; font-weight: 600; border: none; border-radius: 8px; cursor: pointer;
-            transition: all var(--transition-speed); text-transform: uppercase; letter-spacing: 0.5px;
-            min-width: 150px; position: relative; overflow: hidden;
-        }
-        .btn::before { content: ''; position: absolute; top: 50%; left: 50%; width: 0; height: 0; border-radius: 50%; background: rgba(255, 255, 255, 0.3); transform: translate(-50%, -50%); transition: width 0.6s, height 0.6s; }
-        .btn:hover::before { width: 300px; height: 300px; }
-        .btn-primary { background: linear-gradient(135deg, var(--primary-color), var(--primary-dark)); color: white; box-shadow: var(--shadow-sm); }
-        .btn-primary:hover:not(:disabled) { transform: translateY(-2px); box-shadow: var(--shadow-md); }
-        .btn-secondary { background: white; color: var(--primary-color); border: 2px solid var(--primary-color); }
-        .btn-secondary:hover:not(:disabled) { background: var(--primary-color); color: white; }
-        .btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none !important; }
-        
-        .instructions-panel {
-            background: linear-gradient(135deg, rgba(103, 58, 183, 0.05), rgba(103, 58, 183, 0.02));
-            border-left: 4px solid var(--primary-color); padding: 1.5rem; border-radius: 8px; margin: 2rem 0; line-height: 1.6;
-        }
-        .instructions-panel h3 { color: var(--primary-color); margin-bottom: 1rem; font-size: 1.25rem; }
-        
-        .message-box { padding: 1rem; border-radius: 8px; margin: 1rem 0; text-align: center; font-weight: 500; transition: all var(--transition-speed); }
-        .message-info { background: rgba(0, 188, 212, 0.1); color: var(--info-color); border: 1px solid rgba(0, 188, 212, 0.3); }
-        .message-success { background: rgba(76, 175, 80, 0.1); color: var(--success-color); border: 1px solid rgba(76, 175, 80, 0.3); }
-        .message-warning { background: rgba(255, 152, 0, 0.1); color: var(--warning-color); border: 1px solid rgba(255, 152, 0, 0.3); }
-        .message-error { background: rgba(244, 67, 54, 0.1); color: var(--error-color); border: 1px solid rgba(244, 67, 54, 0.3); }
-
-        .progress-bar { width: 100%; height: 8px; background: var(--border-color); border-radius: 4px; overflow: hidden; margin: 1rem 0; transition: all var(--transition-speed); }
-        .progress-fill { height: 100%; background: linear-gradient(90deg, var(--primary-color), var(--success-color)); transition: width var(--transition-speed); width: 0%; }
-        
-        /* Modal Styles (similar to TMT-A) */
-        .modal {
-            display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0, 0, 0, 0.7); z-index: 1000; justify-content: center; align-items: center; animation: fadeIn 0.3s;
-        }
-        .modal.show { display: flex; }
-        .modal-content {
-            background: white; border-radius: var(--border-radius); padding: 2rem;
-            max-width: 800px; width: 90%; max-height: 90vh; overflow-y: auto;
-            box-shadow: var(--shadow-lg); animation: slideUp 0.3s;
-        }
-        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
-        @keyframes slideUp { from { transform: translateY(50px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
-        .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; padding-bottom: 1rem; border-bottom: 2px solid var(--border-color); }
-        .modal-header h2 { color: var(--primary-color); font-size: 1.5rem; }
-        .modal-close { background: none; border: none; font-size: 1.5rem; cursor: pointer; color: var(--text-secondary); transition: color var(--transition-speed); }
-        .modal-close:hover { color: var(--error-color); }
-        .results-section { margin: 1.5rem 0; padding: 1rem; background: #fafafa; border-radius: 8px; }
-        .results-section h3 { color: var(--primary-dark); margin-bottom: 1rem; font-size: 1.1rem; }
-        .results-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; }
-        .result-item { padding: 0.75rem; background: white; border-radius: 6px; border: 1px solid var(--border-color); }
-        .result-label { font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 0.25rem; }
-        .result-value { font-size: 1.25rem; font-weight: bold; color: var(--primary-color); }
-        .export-buttons { display: flex; gap: 1rem; justify-content: center; margin-top: 2rem; flex-wrap: wrap; }
-
-        @media (max-width: 768px) {
-            .header h1 { font-size: 1.5rem; }
-            .test-canvas { height: 400px; }
-            .stats-grid { grid-template-columns: repeat(2, 1fr); }
-            :root { --circle-size: 46px; --min-distance: 70px; }
-        }
-    </style>
+<style>
+:root{
+  --primary:#673AB7; --primary-dark:#512DA8;
+  --success:#4CAF50; --error:#f44336; --warning:#FF9800; --info:#00BCD4;
+  --num-bg:#E3F2FD; --let-bg:#F1F8E9; --num-bd:#2196F3; --let-bd:#8BC34A;
+  --bg0:#f4f6f9; --bg1:#e9ecf1; --text:#212121; --muted:#666; --line:#e0e0e0;
+  --r:12px; --shadow-sm:0 2px 4px rgba(0,0,0,.1); --shadow-md:0 4px 8px rgba(0,0,0,.15); --shadow-lg:0 8px 16px rgba(0,0,0,.2);
+  --circle:52px; --minDist:84px; --t:.25s;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{
+  font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Ubuntu,system-ui,sans-serif;
+  background:linear-gradient(135deg,var(--bg0),var(--bg1));
+  color:var(--text); display:flex; align-items:center; justify-content:center; padding:1rem;
+}
+.container{width:100%;max-width:1200px;background:#fff;border-radius:var(--r);box-shadow:var(--shadow-lg);overflow:hidden}
+.header{background:linear-gradient(135deg,var(--primary),var(--primary-dark));color:#fff;text-align:center;padding:2rem}
+.header h1{font-weight:700;font-size:2rem;text-shadow:0 2px 4px rgba(0,0,0,.25)}
+.header p{opacity:.95;margin-top:.25rem}
+.main{padding:1.5rem}
+.phase{display:flex;gap:.5rem;justify-content:center;flex-wrap:wrap;margin-bottom:1.25rem}
+.dot{width:40px;height:40px;border-radius:999px;display:flex;align-items:center;justify-content:center;background:#f5f5f5;color:var(--muted);font-weight:700;position:relative;transition:transform var(--t),background var(--t),color var(--t)}
+.dot::after{content:attr(data-label);position:absolute;bottom:-20px;font-size:.72rem;color:var(--muted);white-space:nowrap}
+.dot.active{background:var(--primary);color:#fff;transform:scale(1.06);box-shadow:0 0 0 4px rgba(103,58,183,.2)}
+.dot.done{background:var(--success);color:#fff}
+.instructions{
+  background:linear-gradient(135deg,rgba(103,58,183,.06),rgba(103,58,183,.025));
+  border-left:4px solid var(--primary);border-radius:8px;padding:1rem;line-height:1.6;margin:1rem 0 1.25rem
+}
+.instructions h3{color:var(--primary);margin-bottom:.5rem}
+.progress{height:8px;border-radius:4px;background:var(--line);overflow:hidden}
+.progress .fill{height:100%;width:0;background:linear-gradient(90deg,var(--primary),var(--success));transition:width .3s}
+.stage{
+  margin:1rem auto 0; width:100%;max-width:900px;height:520px;border:3px solid var(--line);border-radius:var(--r);
+  position:relative;background:#fafafa;box-shadow:inset 0 2px 8px rgba(0,0,0,.05);touch-action:manipulation;
+}
+.countdown{
+  position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:8rem;color:var(--primary);
+  background:rgba(255,255,255,.85);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);z-index:50
+}
+.node{
+  position:absolute;width:var(--circle);height:var(--circle);border-radius:999px;border:3px solid;display:flex;align-items:center;justify-content:center;
+  font-weight:800;font-size:1.15rem;cursor:pointer;user-select:none;box-shadow:var(--shadow-sm);transition:transform var(--t),box-shadow var(--t),background var(--t),color var(--t),border-color var(--t);
+}
+.node.number{background:var(--num-bg);border-color:var(--num-bd);color:var(--num-bd)}
+.node.letter{background:var(--let-bg);border-color:var(--let-bd);color:var(--let-bd)}
+.node:hover,.node:focus{outline:0;transform:scale(1.12);box-shadow:var(--shadow-md)}
+.node.target{animation:pulse 1.4s infinite}
+.node.correct{background:var(--success)!important;color:#fff!important;border-color:var(--success)!important;transform:scale(.96);pointer-events:none}
+.node.err{animation:shake .4s;border-color:var(--error)!important}
+.line{position:absolute;height:3px;background:var(--success);transform-origin:left center;z-index:5;pointer-events:none}
+@keyframes pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.06)}}
+@keyframes shake{0%,100%{transform:translateX(0)}25%{transform:translateX(-7px)}75%{transform:translateX(7px)}}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:.75rem;margin:1rem 0}
+.card{background:linear-gradient(135deg,#f7f7f7,#fff);border:1px solid var(--line);border-radius:var(--r);padding:1rem;text-align:center;transition:transform var(--t),box-shadow var(--t)}
+.card:hover{transform:translateY(-2px);box-shadow:var(--shadow-md)}
+.val{font-weight:800;font-size:1.6rem;color:var(--primary)}
+.lab{font-size:.8rem;color:var(--muted);letter-spacing:.04em;text-transform:uppercase;margin-top:.15rem}
+.controls{display:flex;gap:.5rem;flex-wrap:wrap;justify-content:center;margin:1rem 0}
+.btn{
+  min-width:160px;padding:.75rem 1.25rem;border-radius:10px;border:2px solid transparent;font-weight:800;letter-spacing:.02em;cursor:pointer;
+  transition:transform var(--t),box-shadow var(--t),background var(--t),color var(--t),border var(--t)
+}
+.btn:focus-visible{outline:3px solid #000;outline-offset:2px}
+.btn[disabled]{opacity:.55;cursor:not-allowed}
+.btn-primary{background:linear-gradient(135deg,var(--primary),var(--primary-dark));color:#fff}
+.btn-primary:hover:not([disabled]){transform:translateY(-2px);box-shadow:var(--shadow-md)}
+.btn-sec{background:#fff;color:var(--primary);border-color:var(--primary)}
+.btn-sec:hover:not([disabled]){background:var(--primary);color:#fff}
+.msg{margin:.75rem 0;padding:.75rem;border-radius:8px;text-align:center;font-weight:600}
+.msg.info{background:rgba(0,188,212,.1);color:var(--info);border:1px solid rgba(0,188,212,.3)}
+.msg.ok{background:rgba(76,175,80,.1);color:var(--success);border:1px solid rgba(76,175,80,.3)}
+.msg.warn{background:rgba(255,152,0,.12);color:var(--warning);border:1px solid rgba(255,152,0,.3)}
+.msg.err{background:rgba(244,67,54,.12);color:var(--error);border:1px solid rgba(244,67,54,.3)}
+/* modal */
+.modal{position:fixed;inset:0;background:rgba(0,0,0,.7);display:none;align-items:center;justify-content:center;z-index:1000}
+.modal.show{display:flex;animation:fade .25s}
+@keyframes fade{from{opacity:0}to{opacity:1}}
+.sheet{background:#fff;border-radius:14px;max-width:960px;width:92%;max-height:92vh;overflow:auto;box-shadow:var(--shadow-lg);padding:1.25rem}
+.sheet header{display:flex;gap:.5rem;align-items:center;justify-content:space-between;border-bottom:2px solid var(--line);padding-bottom:.75rem;margin-bottom:.75rem}
+.sheet h2{color:var(--primary)}
+.close{background:none;border:0;font-size:1.6rem;cursor:pointer;color:var(--muted)}
+.section{background:#fafafa;border:1px solid var(--line);border-radius:10px;padding:1rem;margin:.75rem 0}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:.5rem}
+.item{background:#fff;border:1px solid var(--line);border-radius:8px;padding:.75rem}
+.item .lab{margin:0;color:var(--muted)}
+.item .val{font-size:1.2rem;color:var(--primary)}
+.export{display:flex;gap:.5rem;flex-wrap:wrap;justify-content:center;margin-top:.5rem}
+kbd{background:#eee;border-radius:6px;border:1px solid #ddd;padding:.1rem .35rem}
+.test-on .stats,.test-on .progress{opacity:.2}
+@media (max-width:768px){
+  :root{--circle:46px;--minDist:72px}
+  .header h1{font-size:1.55rem}
+  .stage{height:440px}
+}
+</style>
 </head>
 <body>
-    <div class="container" id="container">
-        <header class="header">
-            <h1>Teste de Trilhas - Parte B (TMT-B)</h1>
-            <p>Avaliação da Flexibilidade Cognitiva e Controle Executivo</p>
-        </header>
+<div class="container" id="root">
+  <header class="header">
+    <h1>Teste de Trilhas — Parte B (TMT-B)</h1>
+    <p>Avaliação de atenção alternada e flexibilidade cognitiva</p>
+  </header>
 
-        <main class="main-content">
-            <div class="phase-indicator">
-                <div class="phase-dot" id="phase-1" data-label="Instruções">1</div>
-                <div class="phase-dot" id="phase-2" data-label="Aquecimento">2</div>
-                <div class="phase-dot" id="phase-3" data-label="Teste">3</div>
-                <div class="phase-dot" id="phase-4" data-label="Resultados">4</div>
-            </div>
-
-            <div class="instructions-panel" id="instructions">
-                <h3>📋 Como Realizar o Teste</h3>
-                <p>
-                    Sua tarefa é clicar nos círculos alternando entre **números** e **letras**, em ordem crescente. A sequência correta é: <strong>1 → A → 2 → B → 3 → C</strong> e assim por diante, até o último item.
-                    <br><br>
-                    Tente fazer isso o mais rápido que puder, sem cometer erros. Vamos começar com um pequeno aquecimento.
-                </p>
-            </div>
-
-            <div class="progress-bar">
-                <div class="progress-fill" id="progress"></div>
-            </div>
-
-            <div class="test-canvas" id="testCanvas"></div>
-
-            <div class="stats-grid">
-                <div class="stat-card stat-card-timer">
-                    <div class="stat-value" id="timer">00:00</div>
-                    <div class="stat-label">Tempo</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-value" id="current">1</div>
-                    <div class="stat-label">Próximo</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-value" id="errors">0</div>
-                    <div class="stat-label">Erros</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-value" id="switch-cost">-</div>
-                    <div class="stat-label">Custo de Alternância</div>
-                </div>
-            </div>
-
-            <div class="message-box message-info" id="message">
-                Bem-vindo! Clique em "Começar Aquecimento" para praticar.
-            </div>
-
-            <div class="controls">
-                <button class="btn btn-secondary" id="practiceBtn">Começar Aquecimento</button>
-                <button class="btn btn-primary" id="startBtn" disabled>Começar Teste Principal</button>
-                <button class="btn btn-secondary" id="resultsBtn" style="display:none;">Ver Resultados</button>
-                <button class="btn btn-secondary" id="resetBtn">Reiniciar</button>
-            </div>
-        </main>
+  <main class="main">
+    <div class="phase" aria-hidden="true">
+      <div class="dot" id="p1" data-label="Instruções">1</div>
+      <div class="dot" id="p2" data-label="Aquecimento">2</div>
+      <div class="dot" id="p3" data-label="Teste">3</div>
+      <div class="dot" id="p4" data-label="Resultados">4</div>
     </div>
 
-    <div class="modal" id="resultsModal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h2>📊 Relatório de Resultados - TMT-B</h2>
-                <button class="modal-close" id="closeModal">&times;</button>
-            </div>
-            <div class="results-section">
-                <h3>Desempenho Geral</h3>
-                <div class="results-grid">
-                    <div class="result-item"><div class="result-label">Tempo Total</div><div class="result-value" id="result-time">-</div></div>
-                    <div class="result-item"><div class="result-label">Total de Erros</div><div class="result-value" id="result-errors">-</div></div>
-                    <div class="result-item"><div class="result-label">Precisão</div><div class="result-value" id="result-accuracy">-</div></div>
-                    <div class="result-item"><div class="result-label">Classificação</div><div class="result-value" id="result-performance">-</div></div>
-                </div>
-            </div>
-            <div class="results-section">
-                <h3>Análise de Flexibilidade Cognitiva</h3>
-                <div class="results-grid">
-                    <div class="result-item"><div class="result-label">Custo de Alternância</div><div class="result-value" id="result-switch-cost">-</div></div>
-                    <div class="result-item"><div class="result-label">Tempo Médio (Alternância)</div><div class="result-value" id="result-avg-switch">-</div></div>
-                    <div class="result-item"><div class="result-label">Tempo Médio (Não Alternância)</div><div class="result-value" id="result-avg-non-switch">-</div></div>
-                    <div class="result-item"><div class="result-label">Eficiência Espacial</div><div class="result-value" id="result-efficiency">-</div></div>
-                </div>
-            </div>
-            <div class="results-section">
-                <h3>Análise de Erros</h3>
-                <div class="results-grid">
-                    <div class="result-item"><div class="result-label">Erros de Categoria</div><div class="result-value" id="error-category">-</div></div>
-                    <div class="result-item"><div class="result-label">Erros de Sequência</div><div class="result-value" id="error-sequence">-</div></div>
-                    <div class="result-item"><div class="result-label">Erros de Regressão</div><div class="result-value" id="error-regression">-</div></div>
-                    <div class="result-item"><div class="result-label">Índice de Perseveração</div><div class="result-value" id="error-perseveration">-</div></div>
-                </div>
-            </div>
-            <div class="export-buttons">
-                <button class="btn btn-primary" id="exportCSV">📥 Exportar CSV</button>
-                <button class="btn btn-primary" id="exportJSON">📥 Exportar JSON</button>
-            </div>
-        </div>
+    <div class="instructions" id="instructions">
+      <h3>📋 Como executar</h3>
+      <p>Toque/clique alternando <strong>números</strong> e <strong>letras</strong> em ordem crescente: <strong>1 → A → 2 → B → 3 → C</strong> … até <strong>13 → L</strong>.
+      Faça o mais rápido possível e sem erros. Em caso de erro, <em>o tempo continua</em> e será necessário selecionar o item correto para avançar.</p>
+      <p style="margin-top:.5rem">Recomenda-se ambiente silencioso, tela em modo paisagem (se possível) e uma tentativa de treino antes do teste principal.</p>
     </div>
 
-    <script>
-    class TMTBTest {
-        constructor() {
-            this.initializeConfig();
-            this.initializeElements();
-            this.bindEvents();
-            this.reset();
-        }
+    <div class="progress" aria-hidden="true"><div class="fill" id="progress"></div></div>
+    <div class="stage" id="stage" role="application" aria-label="Área do teste TMT-B"></div>
 
-        initializeConfig() {
-            this.config = {
-                PRACTICE_PAIRS: 4, // 1-A to 4-D
-                FULL_PAIRS: 12, // 1-A to 12-L, plus final 13
-                MAX_TIME: 300000, // 5 minutos
-            };
+    <section class="stats" aria-hidden="true">
+      <div class="card"><div class="val" id="timer">00:00</div><div class="lab">Tempo</div></div>
+      <div class="card"><div class="val" id="next">1</div><div class="lab">Próximo</div></div>
+      <div class="card"><div class="val" id="errs">0</div><div class="lab">Erros</div></div>
+      <div class="card"><div class="val" id="switch">–</div><div class="lab">Custo de alternância</div></div>
+    </section>
 
-            this.fullSequence = this.generateSequence(this.config.FULL_PAIRS);
-            this.practiceSequence = this.generateSequence(this.config.PRACTICE_PAIRS);
-        }
+    <div class="msg info" id="msg" role="status" aria-live="polite">
+      Bem-vindo! Inicie pelo <strong>Aquecimento</strong>.
+    </div>
 
-        generateSequence(pairs) {
-            const sequence = [];
-            for (let i = 1; i <= pairs; i++) {
-                sequence.push({ value: i.toString(), type: 'number' });
-                sequence.push({ value: String.fromCharCode(64 + i), type: 'letter' });
-            }
-            if (pairs === this.config.FULL_PAIRS) {
-                sequence.push({ value: (pairs + 1).toString(), type: 'number' });
-            }
-            return sequence;
-        }
+    <div class="controls">
+      <button class="btn btn-sec" id="btnPractice" aria-label="Começar aquecimento">Começar Aquecimento</button>
+      <button class="btn btn-primary" id="btnStart" aria-label="Começar teste principal" disabled>Começar Teste Principal</button>
+      <button class="btn btn-sec" id="btnResults" aria-label="Ver resultados" style="display:none">Ver Resultados</button>
+      <button class="btn btn-sec" id="btnReset" aria-label="Reiniciar">Reiniciar</button>
+    </div>
+  </main>
+</div>
 
-        initializeElements() {
-            this.container = document.getElementById('container');
-            this.canvas = document.getElementById('testCanvas');
-            this.timerDisplay = document.getElementById('timer');
-            this.currentDisplay = document.getElementById('current');
-            this.errorsDisplay = document.getElementById('errors');
-            this.switchCostDisplay = document.getElementById('switch-cost');
-            this.progressFill = document.getElementById('progress');
-            this.messageBox = document.getElementById('message');
-            
-            this.practiceBtn = document.getElementById('practiceBtn');
-            this.startBtn = document.getElementById('startBtn');
-            this.resultsBtn = document.getElementById('resultsBtn');
-            this.resetBtn = document.getElementById('resetBtn');
+<!-- Modal de resultados -->
+<div class="modal" id="modal">
+  <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="ttl">
+    <header>
+      <h2 id="ttl">📊 Relatório de Resultados — TMT-B</h2>
+      <button class="close" id="closeModal" aria-label="Fechar resultados">×</button>
+    </header>
 
-            this.modal = document.getElementById('resultsModal');
-            this.closeModalBtn = document.getElementById('closeModal');
-            this.exportCSVBtn = document.getElementById('exportCSV');
-            this.exportJSONBtn = document.getElementById('exportJSON');
+    <div class="section">
+      <h3>Desempenho geral</h3>
+      <div class="grid">
+        <div class="item"><div class="lab">Tempo total</div><div class="val" id="r-time">–</div></div>
+        <div class="item"><div class="lab">Total de erros</div><div class="val" id="r-err">–</div></div>
+        <div class="item"><div class="lab">Precisão</div><div class="val" id="r-acc">–</div></div>
+        <div class="item"><div class="lab">Classificação*</div><div class="val" id="r-class">–</div></div>
+      </div>
+      <small>*Heurística para feedback imediato; não substitui normas estratificadas.</small>
+    </div>
 
-            this.phases = {
-                1: document.getElementById('phase-1'), 2: document.getElementById('phase-2'),
-                3: document.getElementById('phase-3'), 4: document.getElementById('phase-4')
-            };
-        }
+    <div class="section">
+      <h3>Flexibilidade cognitiva</h3>
+      <div class="grid">
+        <div class="item"><div class="lab">Custo de alternância</div><div class="val" id="r-switch">–</div></div>
+        <div class="item"><div class="lab">Tempo médio (switch)</div><div class="val" id="r-avg-sw">–</div></div>
+        <div class="item"><div class="lab">Tempo médio (não-switch)</div><div class="val" id="r-avg-nsw">–</div></div>
+        <div class="item"><div class="lab">Eficiência espacial</div><div class="val" id="r-eff">–</div></div>
+      </div>
+    </div>
 
-        bindEvents() {
-            this.practiceBtn.addEventListener('click', () => this.startPractice());
-            this.startBtn.addEventListener('click', () => this.startTest());
-            this.resultsBtn.addEventListener('click', () => this.showModal());
-            this.resetBtn.addEventListener('click', () => this.reset());
-            this.closeModalBtn.addEventListener('click', () => this.hideModal());
-            this.exportCSVBtn.addEventListener('click', () => this.exportToCSV());
-            this.exportJSONBtn.addEventListener('click', () => this.exportToJSON());
-        }
+    <div class="section">
+      <h3>Análise de erros</h3>
+      <div class="grid">
+        <div class="item"><div class="lab">Erros de categoria</div><div class="val" id="r-e-cat">–</div></div>
+        <div class="item"><div class="lab">Erros de sequência</div><div class="val" id="r-e-seq">–</div></div>
+        <div class="item"><div class="lab">Erros de regressão</div><div class="val" id="r-e-reg">–</div></div>
+        <div class="item"><div class="lab">Índice de perseveração</div><div class="val" id="r-perc">–</div></div>
+      </div>
+    </div>
 
-        reset(fullReset = true) {
-            this.stopTimer();
-            this.clearCanvas();
-            this.container.classList.remove('test-in-progress');
-            this.initializeState();
-            
-            if (fullReset) {
-                this.updatePhase(1);
-                this.practiceBtn.style.display = 'inline-block';
-                this.startBtn.style.display = 'inline-block';
-                this.startBtn.disabled = true;
-                this.resultsBtn.style.display = 'none';
+    <div class="export">
+      <button class="btn btn-primary" id="btnCSV">📥 Exportar resumo (CSV)</button>
+      <button class="btn btn-primary" id="btnJSON">📥 Exportar JSON</button>
+      <button class="btn btn-primary" id="btnLOG">📥 Exportar LOG bruto (CSV)</button>
+    </div>
+  </div>
+</div>
 
-                this.timerDisplay.textContent = '00:00';
-                this.currentDisplay.textContent = '1';
-                this.errorsDisplay.textContent = '0';
-                this.switchCostDisplay.textContent = '-';
-                this.progressFill.style.width = '0%';
-                
-                this.showMessage('Bem-vindo! Clique em "Começar Aquecimento" para praticar.', 'info');
-            }
-        }
+<script>
+/* ===== Utilidades ===== */
+const qs = s => document.querySelector(s);
+const qsa = s => Array.from(document.querySelectorAll(s));
+const clamp = (x,a,b)=>Math.max(a,Math.min(b,x));
 
-        initializeState() {
-            this.state = {
-                phase: 'instructions', isRunning: false, isPractice: false,
-                currentIndex: 0, startTime: null, endTime: null,
-                errors: [], clicks: [], nodes: [], positions: [],
-                totalDistance: 0, optimalDistance: 0
-            };
-        }
+/* RNG com semente (Mulberry32) para reprodutibilidade */
+function seededRand(seed){
+  let t = seed >>> 0;
+  return function(){
+    t += 0x6D2B79F5;
+    let r = Math.imul(t ^ t>>>15, 1 | t);
+    r ^= r + Math.imul(r ^ r>>>7, 61 | r);
+    return ((r ^ r>>>14) >>> 0) / 4294967296;
+  };
+}
+function getSeed(){
+  const u = new URL(String(window.location));
+  const s = u.searchParams.get("seed") || (u.hash||"").replace("#","").split("=")[1];
+  return isNaN(+s) ? null : +s;
+}
 
-        updatePhase(phaseNumber) {
-            Object.values(this.phases).forEach(p => p.classList.remove('active', 'completed'));
-            for (let i = 1; i < phaseNumber; i++) this.phases[i].classList.add('completed');
-            this.phases[phaseNumber].classList.add('active');
-        }
+/* ===== Teste TMT-B ===== */
+class TMTB {
+  constructor(){
+    this.cfg = {
+      PRACTICE_PAIRS: 4,     // 1-A a 4-D
+      FULL_PAIRS: 12,        // 1-A a 12-L + 13
+      MAX_TIME_MS: 5*60*1000,
+      MIN_DIST: null,        // definido via CSS em px
+      MARGIN: 52,            // margem interna da área
+      COUNTDOWN: 3
+    };
+    this.el = this.bindElements();
+    this.bindUI();
+    this.reset(true);
+  }
 
-        startPractice() {
-            this.updatePhase(2);
-            this.state.isPractice = true;
-            this.state.phase = 'practice';
-            this.currentSequence = this.practiceSequence;
-            this.showMessage('Prepare-se para o aquecimento...', 'info');
-            this.generateNodes();
-            this.practiceBtn.style.display = 'none';
-            this.startBtn.disabled = true;
+  bindElements(){
+    return {
+      root: qs('#root'),
+      stage: qs('#stage'),
+      msg: qs('#msg'),
+      timer: qs('#timer'),
+      next: qs('#next'),
+      errs: qs('#errs'),
+      switch: qs('#switch'),
+      fill: qs('#progress'),
+      btnPractice: qs('#btnPractice'),
+      btnStart: qs('#btnStart'),
+      btnReset: qs('#btnReset'),
+      btnResults: qs('#btnResults'),
+      dots: {1:qs('#p1'),2:qs('#p2'),3:qs('#p3'),4:qs('#p4')},
+      modal: qs('#modal'), closeModal: qs('#closeModal'),
+      r:{time:qs('#r-time'), err:qs('#r-err'), acc:qs('#r-acc'), cls:qs('#r-class'),
+         sw:qs('#r-switch'), asw:qs('#r-avg-sw'), answ:qs('#r-avg-nsw'), eff:qs('#r-eff'),
+         ecat:qs('#r-e-cat'), eseq:qs('#r-e-seq'), ereg:qs('#r-e-reg'), perc:qs('#r-perc')},
+      btnCSV: qs('#btnCSV'), btnJSON: qs('#btnJSON'), btnLOG: qs('#btnLOG')
+    };
+  }
 
-            this.showCountdown(() => {
-                this.container.classList.add('test-in-progress');
-                this.startTimer();
-            });
-        }
-        
-        startTest() {
-            this.updatePhase(3);
-            this.reset(false);
-            this.state.isPractice = false;
-            this.state.phase = 'test';
-            this.currentSequence = this.fullSequence;
-            this.showMessage('Prepare-se para o teste principal...', 'info');
-            this.generateNodes();
-            this.startBtn.style.display = 'none';
-
-            this.showCountdown(() => {
-                this.container.classList.add('test-in-progress');
-                this.startTimer();
-            });
-        }
-
-        showCountdown(callback) {
-            const overlay = document.createElement('div');
-            overlay.className = 'countdown-overlay';
-            this.canvas.appendChild(overlay);
-            let count = 3;
-            overlay.textContent = count;
-            const interval = setInterval(() => {
-                count--;
-                if (count > 0) overlay.textContent = count;
-                else if (count === 0) overlay.textContent = 'JÁ!';
-                else {
-                    clearInterval(interval);
-                    this.canvas.removeChild(overlay);
-                    callback();
-                }
-            }, 1000);
-        }
-
-        generateNodes() {
-            this.clearCanvas();
-            this.state.nodes = [];
-            this.state.positions = [];
-            const rect = this.canvas.getBoundingClientRect();
-            const margin = 50;
-            
-            this.currentSequence.forEach(item => {
-                let position, attempts = 0;
-                do {
-                    position = {
-                        x: Math.random() * (rect.width - 2 * margin) + margin,
-                        y: Math.random() * (rect.height - 2 * margin) + margin,
-                    };
-                    attempts++;
-                } while (this.isTooClose(position) && attempts < 100);
-                
-                this.state.positions.push({ ...position, item });
-                this.createNode(position, item);
-            });
-            this.calculateOptimalDistance();
-            this.highlightTarget();
-        }
-
-        isTooClose(newPos) {
-            const minDistance = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--min-distance'));
-            return this.state.positions.some(pos => Math.sqrt(Math.pow(newPos.x - pos.x, 2) + Math.pow(newPos.y - pos.y, 2)) < minDistance);
-        }
-
-        createNode(position, item) {
-            const node = document.createElement('div');
-            node.className = `circle-node ${item.type}`;
-            node.textContent = item.value;
-            node.style.left = (position.x - parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--circle-size')) / 2) + 'px';
-            node.style.top = (position.y - parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--circle-size')) / 2) + 'px';
-            node.addEventListener('click', () => this.handleNodeClick(item, node));
-            this.canvas.appendChild(node);
-            this.state.nodes.push({node, item});
-        }
-
-        handleNodeClick(item, node) {
-            if (!this.state.isRunning) return;
-            
-            const timestamp = performance.now();
-            const expectedItem = this.currentSequence[this.state.currentIndex];
-            const isCorrect = item.value === expectedItem.value && item.type === expectedItem.type;
-
-            this.state.clicks.push({ item, expectedItem, timestamp, isCorrect });
-
-            if (isCorrect) this.handleCorrectClick(node, timestamp);
-            else this.handleIncorrectClick(node, item, expectedItem, timestamp);
-        }
-
-        handleCorrectClick(node, timestamp) {
-            node.classList.add('correct');
-            if (this.state.currentIndex > 0) {
-                this.drawTrail(this.state.currentIndex - 1, this.state.currentIndex);
-                this.updateDistance(this.state.currentIndex - 1, this.state.currentIndex);
-            }
-            this.state.currentIndex++;
-
-            if (this.state.currentIndex >= this.currentSequence.length) {
-                this.completeTest();
-            } else {
-                this.highlightTarget();
-                this.updateProgress();
-            }
-        }
-
-        handleIncorrectClick(node, clickedItem, expectedItem, timestamp) {
-            node.classList.add('error');
-            setTimeout(() => node.classList.remove('error'), 500);
-            
-            this.state.errors.push({ clickedItem, expectedItem, timestamp });
-            this.errorsDisplay.textContent = this.state.errors.length;
-            this.showMessage(`Atenção! Por favor, clique em ${expectedItem.value}`, 'warning');
-        }
-
-        drawTrail(fromIndex, toIndex) {
-            const fromPos = this.state.positions[fromIndex];
-            const toPos = this.state.positions[toIndex];
-            const trail = document.createElement('div');
-            trail.className = 'trail-line';
-            const dx = toPos.x - fromPos.x;
-            const dy = toPos.y - fromPos.y;
-            const distance = Math.sqrt(dx*dx + dy*dy);
-            const angle = Math.atan2(dy, dx) * 180 / Math.PI;
-            trail.style.width = `${distance}px`;
-            trail.style.left = `${fromPos.x}px`;
-            trail.style.top = `${fromPos.y}px`;
-            trail.style.transform = `rotate(${angle}deg)`;
-            this.canvas.appendChild(trail);
-        }
-
-        updateDistance(fromIndex, toIndex) {
-            const fromPos = this.state.positions[fromIndex];
-            const toPos = this.state.positions[toIndex];
-            this.state.totalDistance += Math.sqrt(Math.pow(toPos.x - fromPos.x, 2) + Math.pow(toPos.y - fromPos.y, 2));
-        }
-
-        calculateOptimalDistance() {
-            this.state.optimalDistance = 0;
-            for (let i = 1; i < this.state.positions.length; i++) {
-                const prev = this.state.positions[i-1];
-                const curr = this.state.positions[i];
-                this.state.optimalDistance += Math.sqrt(Math.pow(curr.x - prev.x, 2) + Math.pow(curr.y - prev.y, 2));
-            }
-        }
-        
-        highlightTarget() {
-            this.state.nodes.forEach(({node, item}) => node.classList.remove('target'));
-            if (this.state.currentIndex < this.currentSequence.length) {
-                const target = this.state.nodes.find(n => n.item.value === this.currentSequence[this.state.currentIndex].value && n.item.type === this.currentSequence[this.state.currentIndex].type);
-                if (target) target.node.classList.add('target');
-                this.currentDisplay.textContent = this.currentSequence[this.state.currentIndex].value;
-            }
-        }
-        
-        updateProgress() {
-            const progress = (this.state.currentIndex / this.currentSequence.length) * 100;
-            this.progressFill.style.width = `${progress}%`;
-            this.calculateAndDisplaySwitchCost();
-        }
-
-        startTimer() {
-            this.state.isRunning = true;
-            this.state.startTime = performance.now();
-            this.timerInterval = setInterval(() => {
-                const elapsed = performance.now() - this.state.startTime;
-                if (elapsed > this.config.MAX_TIME) return this.completeTest(true);
-                const minutes = Math.floor(elapsed / 60000);
-                const seconds = Math.floor((elapsed % 60000) / 1000);
-                this.timerDisplay.textContent = `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
-            }, 100);
-        }
-
-        stopTimer() {
-            if (this.timerInterval) clearInterval(this.timerInterval);
-            this.state.isRunning = false;
-        }
-
-        completeTest(timeout = false) {
-            this.stopTimer();
-            this.state.endTime = performance.now();
-            this.state.phase = 'completed';
-            this.container.classList.remove('test-in-progress');
-
-            if (this.state.isPractice) {
-                this.showMessage('Aquecimento concluído! Clique em "Começar Teste Principal".', 'success');
-                this.startBtn.disabled = false;
-            } else {
-                this.updatePhase(4);
-                this.calculateResults();
-                this.showMessage('Teste concluído com sucesso!', 'success');
-                this.resultsBtn.style.display = 'inline-block';
-                this.displayResultsInModal();
-                this.showModal();
-            }
-        }
-        
-        calculateResults() {
-            const totalTime = this.state.endTime - this.state.startTime;
-            const clicks = this.state.clicks.filter(c => c.isCorrect);
-            let switchTimes = [], nonSwitchTimes = [];
-
-            for (let i = 1; i < clicks.length; i++) {
-                const timeDiff = clicks[i].timestamp - clicks[i - 1].timestamp;
-                if (clicks[i].item.type !== clicks[i - 1].item.type) {
-                    switchTimes.push(timeDiff);
-                } else {
-                    nonSwitchTimes.push(timeDiff);
-                }
-            }
-
-            const avgSwitch = switchTimes.length ? switchTimes.reduce((a, b) => a + b, 0) / switchTimes.length : 0;
-            const avgNonSwitch = nonSwitchTimes.length ? nonSwitchTimes.reduce((a, b) => a + b, 0) / nonSwitchTimes.length : 0;
-            const switchCost = avgSwitch > 0 && avgNonSwitch > 0 ? avgSwitch - avgNonSwitch : 0;
-            const accuracy = this.state.clicks.length > 0 ? (this.state.clicks.filter(c => c.isCorrect).length / this.state.clicks.length) * 100 : 0;
-            const efficiency = this.state.optimalDistance > 0 ? (this.state.optimalDistance / this.state.totalDistance) * 100 : 0;
-            
-            // Error analysis
-            let errorTypes = { category: 0, sequence: 0, regression: 0 };
-            this.state.errors.forEach(err => {
-                if (err.clickedItem.type !== err.expectedItem.type) {
-                    errorTypes.category++;
-                } else {
-                    const clickedVal = parseInt(err.clickedItem.value) || err.clickedItem.value.charCodeAt(0);
-                    const expectedVal = parseInt(err.expectedItem.value) || err.expectedItem.value.charCodeAt(0);
-                    if (clickedVal < expectedVal) errorTypes.regression++;
-                    else errorTypes.sequence++;
-                }
-            });
-
-            this.results = {
-                totalTime, totalErrors: this.state.errors.length, accuracy,
-                switchCost, avgSwitch, avgNonSwitch, efficiency, errorTypes,
-                perseverationIndex: this.state.errors.length > 0 ? (errorTypes.regression / this.state.errors.length) * 100 : 0
-            };
-            this.results.performance = this.classifyPerformance(this.results);
-        }
-
-        classifyPerformance(res) {
-            const timeSec = res.totalTime / 1000;
-            if (timeSec > 290 || res.totalErrors > 15) return "Comprometido";
-            if (timeSec > 90 || res.totalErrors > 5) return "Limítrofe";
-            if (timeSec > 78) return "Médio Baixo";
-            if (timeSec > 36) return "Médio";
-            return "Superior";
-        }
-        
-        displayResultsInModal() {
-            document.getElementById('result-time').textContent = `${(this.results.totalTime / 1000).toFixed(2)}s`;
-            document.getElementById('result-errors').textContent = this.results.totalErrors;
-            document.getElementById('result-accuracy').textContent = `${this.results.accuracy.toFixed(1)}%`;
-            document.getElementById('result-performance').textContent = this.results.performance;
-            document.getElementById('result-switch-cost').textContent = `${this.results.switchCost.toFixed(0)}ms`;
-            document.getElementById('result-avg-switch').textContent = `${this.results.avgSwitch.toFixed(0)}ms`;
-            document.getElementById('result-avg-non-switch').textContent = `${this.results.avgNonSwitch.toFixed(0)}ms`;
-            document.getElementById('result-efficiency').textContent = `${this.results.efficiency.toFixed(1)}%`;
-            document.getElementById('error-category').textContent = this.results.errorTypes.category;
-            document.getElementById('error-sequence').textContent = this.results.errorTypes.sequence;
-            document.getElementById('error-regression').textContent = this.results.errorTypes.regression;
-            document.getElementById('error-perseveration').textContent = `${this.results.perseverationIndex.toFixed(1)}%`;
-        }
-        
-        calculateAndDisplaySwitchCost() {
-            const clicks = this.state.clicks.filter(c => c.isCorrect);
-            if (clicks.length < 2) return;
-            let switchTimes = [], nonSwitchTimes = [];
-            for (let i = 1; i < clicks.length; i++) {
-                const timeDiff = clicks[i].timestamp - clicks[i - 1].timestamp;
-                if (clicks[i].item.type !== clicks[i-1].item.type) switchTimes.push(timeDiff);
-                else nonSwitchTimes.push(timeDiff);
-            }
-            if (switchTimes.length > 0 && nonSwitchTimes.length > 0) {
-                const avgSwitch = switchTimes.reduce((a, b) => a + b, 0) / switchTimes.length;
-                const avgNonSwitch = nonSwitchTimes.reduce((a, b) => a + b, 0) / nonSwitchTimes.length;
-                this.switchCostDisplay.textContent = `${Math.round(avgSwitch - avgNonSwitch)} ms`;
-            }
-        }
-        
-        showMessage(text, type) {
-            this.messageBox.textContent = text;
-            this.messageBox.className = `message-box message-${type}`;
-        }
-        
-        clearCanvas() { this.canvas.innerHTML = ''; }
-        showModal() { this.modal.classList.add('show'); }
-        hideModal() { this.modal.classList.remove('show'); }
-        
-        exportToJSON() {
-            const dataStr = JSON.stringify({ metadata: { date: new Date().toISOString() }, results: this.results }, null, 2);
-            const blob = new Blob([dataStr], {type: "application/json"});
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `TMT-B_results_${Date.now()}.json`;
-            a.click();
-            URL.revokeObjectURL(url);
-        }
-        
-        exportToCSV() {
-            let csvContent = "data:text/csv;charset=utf-8,";
-            csvContent += "Metrica,Valor\n";
-            Object.entries(this.results).forEach(([key, value]) => {
-                if (typeof value !== 'object') {
-                    csvContent += `${key},${value}\n`;
-                }
-            });
-            const encodedUri = encodeURI(csvContent);
-            const link = document.createElement("a");
-            link.setAttribute("href", encodedUri);
-            link.setAttribute("download", `TMT-B_summary_${Date.now()}.csv`);
-            document.body.appendChild(link);
-            link.click();
-        }
-    }
-
-    document.addEventListener('DOMContentLoaded', () => {
-        new TMTBTest();
+  bindUI(){
+    this.el.btnPractice.addEventListener('click', ()=>this.startPractice());
+    this.el.btnStart.addEventListener('click', ()=>this.startTest());
+    this.el.btnReset.addEventListener('click', ()=>this.reset(true));
+    this.el.btnResults.addEventListener('click', ()=>this.showResults());
+    this.el.closeModal.addEventListener('click', ()=>this.hideResults());
+    this.el.btnCSV.addEventListener('click', ()=>this.exportCSV());
+    this.el.btnJSON.addEventListener('click', ()=>this.exportJSON());
+    this.el.btnLOG.addEventListener('click', ()=>this.exportLogCSV());
+    // evitar espaço rolar página durante teste
+    window.addEventListener('keydown', e=>{
+      if(this.state?.isRunning && (e.key===' '||e.key==='Spacebar')) e.preventDefault();
     });
-    </script>
+    // foco visível nos nós via teclado
+    this.el.stage.addEventListener('keydown', e=>{
+      if(!this.state?.isRunning) return;
+      // sem navegação por teclado para prevenir “atalhos” — apenas clique/toque
+      if(['Enter',' '].includes(e.key)) e.preventDefault();
+    });
+  }
+
+  reset(full=true){
+    this.stopTimer();
+    this.el.root.classList.remove('test-on');
+    this.clearStage();
+    this.seqFull = this.makeSequence(this.cfg.FULL_PAIRS);
+    this.seqPractice = this.makeSequence(this.cfg.PRACTICE_PAIRS);
+    const style = getComputedStyle(document.documentElement);
+    this.cfg.MIN_DIST = parseFloat(style.getPropertyValue('--minDist')) || 80;
+
+    this.state = {
+      phase:'instructions', isPractice:false, isRunning:false,
+      seq:[], current:0, start:0, end:0,
+      nodes:[], pos:[], clicks:[], errors:[], totalDist:0, optimalDist:0,
+      seed: getSeed(), rng: null
+    };
+    this.state.rng = this.state.seed!=null ? seededRand(this.state.seed) : Math.random;
+
+    if(full){
+      this.setPhase(1);
+      this.uiSet(this.el.timer,'00:00');
+      this.uiSet(this.el.next,'1');
+      this.uiSet(this.el.errs,'0');
+      this.uiSet(this.el.switch,'–');
+      this.el.fill.style.width='0%';
+      this.message('Bem-vindo! Clique em “Começar Aquecimento” para praticar.','info');
+      this.el.btnPractice.disabled=false;
+      this.el.btnStart.disabled=true;
+      this.el.btnStart.style.display='inline-block';
+      this.el.btnPractice.style.display='inline-block';
+      this.el.btnResults.style.display='none';
+    }
+  }
+
+  setPhase(n){
+    Object.values(this.el.dots).forEach(d=>d.classList.remove('active','done'));
+    for(let i=1;i<n;i++) this.el.dots[i].classList.add('done');
+    this.el.dots[n].classList.add('active');
+  }
+
+  makeSequence(pairs){
+    const seq=[];
+    for(let i=1;i<=pairs;i++){
+      seq.push({v:String(i), t:'number'});
+      seq.push({v:String.fromCharCode(64+i), t:'letter'}); // A=65
+    }
+    if(pairs===this.cfg.FULL_PAIRS) seq.push({v:String(pairs+1), t:'number'}); // final 13
+    return seq;
+  }
+
+  startPractice(){
+    this.setPhase(2);
+    this.state.isPractice = true;
+    this.state.phase='practice';
+    this.state.seq = this.seqPractice;
+    this.el.btnPractice.disabled=true;
+    this.el.btnStart.disabled=true;
+    this.message('Aquecimento: prepare-se…','info');
+    this.placeNodes();
+    this.countdown(()=>{ this.startTimer(); this.el.root.classList.add('test-on'); });
+  }
+
+  startTest(){
+    this.setPhase(3);
+    this.reset(false);
+    this.state.isPractice = false;
+    this.state.phase='test';
+    this.state.seq = this.seqFull;
+    this.el.btnStart.style.display='none';
+    this.message('Teste principal: prepare-se…','info');
+    this.placeNodes();
+    this.countdown(()=>{ this.startTimer(); this.el.root.classList.add('test-on'); });
+  }
+
+  countdown(cb){
+    const overlay = document.createElement('div');
+    overlay.className='countdown';
+    let n=this.cfg.COUNTDOWN;
+    overlay.textContent=n;
+    this.el.stage.appendChild(overlay);
+    const iv=setInterval(()=>{
+      n--;
+      if(n>0) overlay.textContent=n;
+      else if(n===0) overlay.textContent='JÁ!';
+      else{ clearInterval(iv); overlay.remove(); cb(); }
+    },1000);
+  }
+
+  placeNodes(){
+    this.clearStage();
+    this.state.nodes=[]; this.state.pos=[]; this.state.current=0; this.state.totalDist=0;
+    const r = this.el.stage.getBoundingClientRect();
+    const W=r.width, H=r.height, M=this.cfg.MARGIN, MIN=this.cfg.MIN_DIST;
+    let triesGlobal=0;
+
+    const rand = ()=> this.state.rng();
+
+    for(const item of this.state.seq){
+      let attempts=0, x=0,y=0, ok=false, min=MIN;
+      while(attempts<180){
+        x = M + rand()*(W-2*M);
+        y = M + rand()*(H-2*M);
+        if(this.state.pos.every(p => Math.hypot(x-p.x, y-p.y) >= min)){ ok=true; break; }
+        attempts++;
+        if(attempts%60===0) min = Math.max(48, min-6); // recuo adaptativo para garantir alocação
+      }
+      if(!ok){ // falha rara: recomeça distribuição
+        if(++triesGlobal>3){ console.warn('Distribuição difícil — reduzindo distância mínima.'); }
+        return this.placeNodes();
+      }
+      this.state.pos.push({x,y,item});
+      const node = this.makeNode({x,y,item});
+      this.el.stage.appendChild(node);
+      this.state.nodes.push({node,item});
+    }
+    this.computeOptimalDistance();
+    this.highlightTarget();
+  }
+
+  makeNode({x,y,item}){
+    const d = document.createElement('div');
+    d.className = `node ${item.t}`;
+    d.tabIndex = 0;
+    d.textContent = item.v;
+    const R = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--circle'))||52;
+    d.style.left = `${x - R/2}px`;
+    d.style.top  = `${y - R/2}px`;
+    d.setAttribute('role','button');
+    d.setAttribute('aria-label', (item.t==='number'?'Número ':'Letra ') + item.v);
+    d.addEventListener('pointerdown', (e)=>{ e.preventDefault(); this.onClick(item,d); }, {passive:false});
+    d.addEventListener('click', (e)=>{ e.preventDefault(); }); // padroniza para pointer
+    return d;
+  }
+
+  onClick(item,node){
+    if(!this.state.isRunning) return;
+    const now = performance.now();
+    const expected = this.state.seq[this.state.current];
+    const correct = (item.v===expected.v && item.t===expected.t);
+    this.state.clicks.push({ts:now, item, expected, correct});
+
+    if(correct){
+      node.classList.add('correct');
+      if(this.state.current>0){
+        this.drawLine(this.state.current-1, this.state.current);
+        this.addDistance(this.state.current-1, this.state.current);
+      }
+      this.state.current++;
+      if(this.state.current>=this.state.seq.length){ this.finish(false); }
+      else { this.highlightTarget(); this.updateProgress(); this.updateSwitchCostHUD(); }
+    }else{
+      node.classList.add('err');
+      setTimeout(()=>node.classList.remove('err'), 380);
+      this.state.errors.push({ts:now, clicked:item, expected});
+      this.uiSet(this.el.errs, String(this.state.errors.length));
+      this.message(`Atenção: selecione ${expected.v}.`, 'warn');
+    }
+  }
+
+  drawLine(i,j){
+    const a=this.state.pos[i], b=this.state.pos[j];
+    const dx=b.x-a.x, dy=b.y-a.y;
+    const dist=Math.hypot(dx,dy), ang=Math.atan2(dy,dx)*180/Math.PI;
+    const line=document.createElement('div');
+    line.className='line';
+    line.style.width=`${dist}px`;
+    line.style.left=`${a.x}px`;
+    line.style.top =`${a.y}px`;
+    line.style.transform=`rotate(${ang}deg)`;
+    this.el.stage.appendChild(line);
+  }
+  addDistance(i,j){
+    const a=this.state.pos[i], b=this.state.pos[j];
+    this.state.totalDist += Math.hypot(b.x-a.x, b.y-a.y);
+  }
+  computeOptimalDistance(){
+    this.state.optimalDist=0;
+    for(let i=1;i<this.state.pos.length;i++){
+      const a=this.state.pos[i-1], b=this.state.pos[i];
+      this.state.optimalDist += Math.hypot(b.x-a.x, b.y-a.y);
+    }
+  }
+
+  highlightTarget(){
+    this.state.nodes.forEach(n=>n.node.classList.remove('target'));
+    if(this.state.current < this.state.seq.length){
+      const tgt = this.state.nodes[this.state.current];
+      if(tgt) tgt.node.classList.add('target');
+      this.uiSet(this.el.next, this.state.seq[this.state.current].v);
+    }
+  }
+
+  updateProgress(){
+    const p = (this.state.current / this.state.seq.length)*100;
+    this.el.fill.style.width = `${p}%`;
+  }
+
+  startTimer(){
+    this.state.isRunning=true;
+    this.state.start = performance.now();
+    this.tIV = setInterval(()=>{
+      const elapsed = performance.now() - this.state.start;
+      if(elapsed>=this.cfg.MAX_TIME_MS){ this.finish(true); return; }
+      const mm = Math.floor(elapsed/60000);
+      const ss = Math.floor((elapsed%60000)/1000);
+      this.uiSet(this.el.timer, `${String(mm).padStart(2,'0')}:${String(ss).padStart(2,'0')}`);
+    }, 100);
+  }
+  stopTimer(){ if(this.tIV) clearInterval(this.tIV); this.state.isRunning=false; }
+
+  finish(timeout){
+    this.stopTimer();
+    this.state.end = performance.now();
+    this.state.phase='completed';
+    this.el.root.classList.remove('test-on');
+
+    if(this.state.isPractice){
+      this.message('Aquecimento concluído! Quando pronto, inicie o teste principal.','ok');
+      this.el.btnStart.disabled=false;
+      this.setPhase(2);
+    }else{
+      this.setPhase(4);
+      this.computeResults();
+      this.message(timeout ? 'Tempo esgotado. Resultados disponíveis.' : 'Teste concluído. Resultados disponíveis.', timeout?'warn':'ok');
+      this.el.btnResults.style.display='inline-block';
+      this.showResults();
+    }
+  }
+
+  computeResults(){
+    const total = (this.state.end - this.state.start);
+    const correctClicks = this.state.clicks.filter(c=>c.correct);
+    const times = [];
+    for(let i=1;i<correctClicks.length;i++){
+      times.push(correctClicks[i].ts - correctClicks[i-1].ts);
+    }
+    const sw=[], nsw=[];
+    for(let i=1;i<correctClicks.length;i++){
+      const prev=correctClicks[i-1], cur=correctClicks[i];
+      (cur.item.t!==prev.item.t ? sw : nsw).push(cur.ts - prev.ts);
+    }
+    const avg = arr => arr.length? arr.reduce((a,b)=>a+b,0)/arr.length : 0;
+    const avgSw=avg(sw), avgNsw=avg(nsw);
+    const switchCost = (avgSw>0 && avgNsw>0)? (avgSw - avgNsw) : 0;
+    const accuracy = this.state.clicks.length? (correctClicks.length/this.state.clicks.length)*100 : 0;
+    const efficiency = this.state.totalDist>0? (this.state.optimalDist/this.state.totalDist)*100 : 0;
+
+    // erros tipificados
+    const E={category:0, sequence:0, regression:0};
+    for(const e of this.state.errors){
+      if(e.clicked.t !== e.expected.t) E.category++;
+      else{
+        const toNum = it => (it.t==='number')? parseInt(it.v,10) : (it.v.charCodeAt(0)-64);
+        const clk=toNum(e.clicked), exp=toNum(e.expected);
+        if(clk < exp) E.regression++; else E.sequence++;
+      }
+    }
+    const perseveration = this.state.errors.length? (E.regression/this.state.errors.length)*100 : 0;
+
+    // classificação heurística (ajuste conforme normas locais)
+    const tSec = total/1000;
+    let cls = "Superior";
+    if(tSec>36) cls="Médio";
+    if(tSec>78) cls="Médio Baixo";
+    if(tSec>90 || this.state.errors.length>5) cls="Limítrofe";
+    if(tSec>290 || this.state.errors.length>15) cls="Comprometido";
+
+    this.results = {
+      totalTimeMs: Math.round(total),
+      totalErrors: this.state.errors.length,
+      accuracyPct: accuracy,
+      switchCostMs: switchCost,
+      avgSwitchMs: avgSw,
+      avgNonSwitchMs: avgNsw,
+      spatialEfficiencyPct: efficiency,
+      errorTypes: E,
+      perseverationPct: perseveration,
+      classification: cls,
+      meta: this.makeMeta()
+    };
+  }
+
+  makeMeta(){
+    const d = new Date();
+    return {
+      isoDate: d.toISOString(),
+      version: document.querySelector('meta[name="version"]')?.content || 'NA',
+      practice: this.state.isPractice,
+      seed: this.state.seed ?? null,
+      devicePixelRatio: window.devicePixelRatio||1,
+      ua: navigator.userAgent,
+      screen: {w:window.innerWidth,h:window.innerHeight}
+    };
+  }
+
+  /* ===== UI helpers ===== */
+  message(txt, kind='info'){ this.el.msg.textContent=txt; this.el.msg.className=`msg ${kind}`; }
+  uiSet(el,txt){ el.textContent = txt; }
+  clearStage(){ this.el.stage.innerHTML=''; }
+
+  updateSwitchCostHUD(){
+    const clicks = this.state.clicks.filter(c=>c.correct);
+    if(clicks.length<2){ this.uiSet(this.el.switch,'–'); return; }
+    let sw=[],nsw=[];
+    for(let i=1;i<clicks.length;i++){
+      const dt = clicks[i].ts - clicks[i-1].ts;
+      (clicks[i].item.t!==clicks[i-1].item.t ? sw : nsw).push(dt);
+    }
+    if(sw.length && nsw.length){
+      const m = Math.round(sw.reduce((a,b)=>a+b,0)/sw.length - nsw.reduce((a,b)=>a+b,0)/nsw.length);
+      this.uiSet(this.el.switch, `${m} ms`);
+    }
+  }
+
+  /* ===== Resultados/Exportação ===== */
+  showResults(){
+    if(!this.results){ this.message('Resultados ainda não disponíveis.','warn'); return; }
+    const r=this.results;
+    this.uiSet(this.el.r.time, `${(r.totalTimeMs/1000).toFixed(2)} s`);
+    this.uiSet(this.el.r.err, String(r.totalErrors));
+    this.uiSet(this.el.r.acc, `${r.accuracyPct.toFixed(1)}%`);
+    this.uiSet(this.el.r.cls, r.classification);
+    this.uiSet(this.el.r.sw, `${Math.round(r.switchCostMs)} ms`);
+    this.uiSet(this.el.r.asw, `${Math.round(r.avgSwitchMs)} ms`);
+    this.uiSet(this.el.r.answ, `${Math.round(r.avgNonSwitchMs)} ms`);
+    this.uiSet(this.el.r.eff, `${r.spatialEfficiencyPct.toFixed(1)}%`);
+    this.uiSet(this.el.r.ecat, String(r.errorTypes.category));
+    this.uiSet(this.el.r.eseq, String(r.errorTypes.sequence));
+    this.uiSet(this.el.r.ereg, String(r.errorTypes.regression));
+    this.uiSet(this.el.r.perc, `${r.perseverationPct.toFixed(1)}%`);
+    qs('#modal').classList.add('show');
+  }
+  hideResults(){ qs('#modal').classList.remove('show'); }
+
+  exportJSON(){
+    if(!this.results) return;
+    const payload = {
+      metadata:this.results.meta,
+      summary:{
+        totalTimeMs:this.results.totalTimeMs,
+        totalErrors:this.results.totalErrors,
+        accuracyPct:this.results.accuracyPct,
+        classification:this.results.classification,
+        switchCostMs:this.results.switchCostMs,
+        avgSwitchMs:this.results.avgSwitchMs,
+        avgNonSwitchMs:this.results.avgNonSwitchMs,
+        spatialEfficiencyPct:this.results.spatialEfficiencyPct,
+        errorTypes:this.results.errorTypes,
+        perseverationPct:this.results.perseverationPct
+      },
+      clicks:this.state.clicks.map(c=>({
+        ts:Math.round(c.ts - this.state.start),
+        item:`${c.item.v}-${c.item.t}`,
+        expected:`${c.expected.v}-${c.expected.t}`,
+        correct:c.correct?1:0
+      })),
+      positions:this.state.pos.map((p,i)=>({index:i+1,x:Math.round(p.x),y:Math.round(p.y),label:`${p.item.v}-${p.item.t}`}))
+    };
+    const blob = new Blob([JSON.stringify(payload,null,2)], {type:'application/json'});
+    this.download(blob, `TMTB_${Date.now()}.json`);
+  }
+
+  exportCSV(){
+    if(!this.results) return;
+    const r=this.results;
+    const lines = [
+      'Métrica,Valor',
+      `Tempo_total_ms,${r.totalTimeMs}`,
+      `Erros_totais,${r.totalErrors}`,
+      `Precisao_pct,${r.accuracyPct.toFixed(3)}`,
+      `Classificacao,${r.classification}`,
+      `Custo_alternancia_ms,${Math.round(r.switchCostMs)}`,
+      `Tempo_medio_switch_ms,${Math.round(r.avgSwitchMs)}`,
+      `Tempo_medio_nao_switch_ms,${Math.round(r.avgNonSwitchMs)}`,
+      `Eficiencia_espacial_pct,${r.spatialEfficiencyPct.toFixed(3)}`,
+      `Erros_categoria,${r.errorTypes.category}`,
+      `Erros_sequencia,${r.errorTypes.sequence}`,
+      `Erros_regressao,${r.errorTypes.regression}`,
+      `Indice_perseveracao_pct,${r.perseverationPct.toFixed(3)}`,
+      `Pratica,${this.state.isPractice?1:0}`,
+      `Seed,${this.state.seed??''}`,
+      `Versao,${document.querySelector('meta[name="version"]')?.content||''}`
+    ];
+    const blob = new Blob([lines.join('\n')], {type:'text/csv;charset=utf-8;'});
+    this.download(blob, `TMTB_summary_${Date.now()}.csv`);
+  }
+
+  exportLogCSV(){
+    const hdr = 't_ms,item,expected,correct\n';
+    const rows = this.state.clicks.map(c=>{
+      const t = Math.round(c.ts - this.state.start);
+      return `${t},${c.item.v}-${c.item.t},${c.expected.v}-${c.expected.t},${c.correct?1:0}`;
+    });
+    const blob = new Blob([hdr+rows.join('\n')], {type:'text/csv;charset=utf-8;'});
+    this.download(blob, `TMTB_log_${Date.now()}.csv`);
+  }
+
+  download(blob, filename){
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href=url; a.download=filename; document.body.appendChild(a); a.click();
+    setTimeout(()=>{ URL.revokeObjectURL(url); a.remove(); }, 0);
+  }
+}
+
+/* ===== Inicialização ===== */
+document.addEventListener('DOMContentLoaded', ()=>{
+  const app = new TMTB();
+
+  // acessibilidade: fechar modal com ESC
+  window.addEventListener('keydown', (e)=>{
+    if(e.key==='Escape'){ app.hideResults(); }
+  });
+
+  // dicas visuais de foco
+  qsa('.btn').forEach(b=>b.addEventListener('keydown',e=>{
+    if(e.key==='Enter'||e.key===' ') e.preventDefault();
+  }));
+});
+</script>
 </body>
 </html>
