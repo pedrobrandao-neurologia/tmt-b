@@ -3,10 +3,10 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover"/>
-<title>Trail Making Test B (TMT-B) — Versão 4.1.1</title>
+<title>Trail Making Test B (TMT-B) — Versão 4.2.0</title>
 <meta name="description" content="Implementação digital do TMT-B (atenção alternada / flexibilidade cognitiva) com gerador de formas paralelas, métricas avançadas, comparação normativa (Tombaugh 2004) e avaliação de validade. Processamento 100% local."/>
 <meta name="author" content="Laboratório de Neurociência Cognitiva"/>
-<meta name="version" content="4.1.1"/>
+<meta name="version" content="4.2.0"/>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -18,7 +18,6 @@
   --text:#f0f2f5; --text-dim:#9ca3af;
   --primary:#3b82f6; --primary-dark:#2563eb;
   --success:#22c55e; --error:#ef4444; --warning:#f59e0b;
-  --num:#3b82f6; --let:#a78bfa;           /* distinção número (azul) / letra (violeta) */
   --node-size:44px; --radius:14px;
 }
 [data-theme="light"]{
@@ -101,17 +100,15 @@ body{
   cursor:pointer; user-select:none; -webkit-user-select:none; appearance:none; -webkit-appearance:none;
   transition:transform .12s,background .15s,border-color .15s,box-shadow .15s; z-index:10; padding:0;
 }
-.circle-node.is-number{border-color:var(--num); color:#dbeafe; background:rgba(59,130,246,0.14)}
-.circle-node.is-letter{border-color:var(--let); color:#ede9fe; background:rgba(167,139,250,0.14)}
-[data-theme="light"] .circle-node.is-number{color:#1e40af}
-[data-theme="light"] .circle-node.is-letter{color:#5b21b6}
+/* Números e letras com a MESMA cor (sem distinção cromática): preserva o custo
+   de alternância/busca e aproxima da forma lápis-e-papel (não colorida).
+   NÃO há realce do próximo alvo — o examinando deve localizá-lo sozinho. */
+.circle-node.is-number,.circle-node.is-letter{border-color:var(--border-2); color:var(--text); background:var(--surface-2)}
 .circle-node:focus-visible{outline:3px solid var(--primary); outline-offset:3px}
 .circle-node:active{transform:scale(.94)}
-.circle-node.target{box-shadow:0 0 0 3px rgba(59,130,246,0.35); animation:pulse 1.4s infinite}
 .circle-node.correct{background:rgba(34,197,94,0.18); color:#d6ffe5; border-color:var(--success); box-shadow:0 0 14px rgba(34,197,94,0.55); pointer-events:none}
 .circle-node.error{animation:shake .4s; border-color:var(--error); background:rgba(239,68,68,0.2)}
 .trail-line{position:absolute; background:var(--success); height:4px; transform-origin:left center; z-index:5; pointer-events:none; opacity:.8; border-radius:2px; box-shadow:0 0 8px rgba(34,197,94,0.45)}
-@keyframes pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.07)}}
 @keyframes shake{0%,100%{transform:translateX(0)}25%{transform:translateX(-6px)}75%{transform:translateX(6px)}}
 .progress{height:8px; border-radius:4px; background:var(--surface); overflow:hidden; margin-top:.6rem}
 .progress .fill{height:100%; width:0; background:linear-gradient(90deg,var(--primary),var(--success)); transition:width .3s}
@@ -355,6 +352,7 @@ body{
     </div>
 
     <div class="export-buttons">
+      <button class="btn btn-primary" id="btnPDF">📄 Relatório (PDF)</button>
       <button class="btn btn-primary" id="btnCSV">📥 Resumo (CSV)</button>
       <button class="btn btn-primary" id="btnJSON">📥 JSON</button>
       <button class="btn btn-primary" id="btnLOG">📥 LOG (CSV)</button>
@@ -469,7 +467,7 @@ class TMTB {
           ecat:qs('#r-e-cat'), eseq:qs('#r-e-seq'), ereg:qs('#r-e-reg'), perc:qs('#r-perc'), firsterr:qs('#r-firsterr'),
           dev:qs('#r-dev'), ptr:qs('#r-ptr'), hz:qs('#r-hz'), fast:qs('#r-fast'), focus:qs('#r-focus'), resize:qs('#r-resize'), form:qs('#r-form')},
       validity: qs('#validityBanner'), normResult: qs('#normResult'), normTable: qs('#normTable').querySelector('tbody'),
-      btnCSV: qs('#btnCSV'), btnJSON: qs('#btnJSON'), btnLOG: qs('#btnLOG'), btnSaveLocal: qs('#btnSaveLocal')
+      btnPDF: qs('#btnPDF'), btnCSV: qs('#btnCSV'), btnJSON: qs('#btnJSON'), btnLOG: qs('#btnLOG'), btnSaveLocal: qs('#btnSaveLocal')
     };
   }
 
@@ -482,6 +480,7 @@ class TMTB {
     this.el.btnCSV.addEventListener('click', ()=>this.exportCSV());
     this.el.btnJSON.addEventListener('click', ()=>this.exportJSON());
     this.el.btnLOG.addEventListener('click', ()=>this.exportLogCSV());
+    this.el.btnPDF.addEventListener('click', ()=>this.exportPDF());
     this.el.btnSaveLocal.addEventListener('click', ()=>this.saveLocal());
     this.el.btnTheme.addEventListener('click', ()=>this.toggleTheme());
     this.el.btnSound.addEventListener('click', ()=>this.toggleSound());
@@ -698,12 +697,12 @@ class TMTB {
   computeOptimalDistance(){ this.state.optimalDist=0; for(let i=1;i<this.state.pos.length;i++){ const a=this.state.pos[i-1], b=this.state.pos[i]; this.state.optimalDist += Math.hypot(b.x-a.x, b.y-a.y);} }
 
   highlightTarget(){
-    this.state.nodes.forEach(n=>n.node.classList.remove('target'));
+    // SEM realce visual do próximo alvo: preserva o custo de set-shifting/busca
+    // (o examinando deve localizar o próximo item por conta própria, como no
+    // TMT lápis-e-papel). Apenas atualiza o HUD "Próximo" — que fica oculto
+    // durante a execução (a arena colapsa para só o cronômetro).
     if(this.state.current<this.state.seq.length){
-      const exp=this.state.seq[this.state.current];
-      const tgt=this.state.nodes.find(n=>n.item.v===exp.v && n.item.t===exp.t);
-      if(tgt) tgt.node.classList.add('target');
-      this.uiSet(this.el.next, exp.v);
+      this.uiSet(this.el.next, this.state.seq[this.state.current].v);
     }
   }
   updateProgress(){ this.el.fill.style.width=`${(this.state.current/this.state.seq.length)*100}%`; }
@@ -997,6 +996,150 @@ class TMTB {
     const hdr='t_ms,item,expected,correct\n';
     const rows=this.state.clicks.map(c=>`${Math.round(c.ts-this.state.start)},${c.item.v}-${c.item.t},${c.expected.v}-${c.expected.t},${c.correct?1:0}`);
     this.download(new Blob([hdr+rows.join('\n')],{type:'text/csv;charset=utf-8;'}), `TMTB_log_${Date.now()}.csv`);
+  }
+
+  /* ===== Relatório PDF (gerador embutido, sem dependências) =====
+   * Constrói um PDF real (PDF 1.4, fontes Helvetica padrão, WinAnsiEncoding)
+   * com TODAS as variáveis do relatório, paginado automaticamente. Não usa
+   * bibliotecas externas — produz um download direto como CSV/JSON. */
+  buildReportLines(){
+    if(!this.results) return [];
+    const r=this.results, m=r.meta, L=[];
+    const num=v=>String(v);
+    L.push({title:'Relatório TMT-B — Teste de Trilhas (Parte B)'});
+    L.push({sub:`Versão ${m.version} · ${new Date(m.isoDate).toLocaleString('pt-BR')}`});
+
+    L.push({header:'Desempenho geral'});
+    L.push({k:'Tempo total', v:(r.totalTimeMs/1000).toFixed(2)+' s'});
+    L.push({k:'Itens conectados', v:r.itemsConnected+'/'+this.state.seq.length});
+    L.push({k:'Total de erros', v:num(r.totalErrors)});
+    L.push({k:'Precisão', v:r.accuracyPct.toFixed(1)+'%'});
+    L.push({k:'Classificação heurística', v:r.classification});
+
+    L.push({header:'Flexibilidade cognitiva (específico do TMT-B)'});
+    L.push({k:'Custo de alternância', v:Math.round(r.switchCostMs)+' ms'});
+    L.push({k:'Tempo médio (switch)', v:Math.round(r.avgSwitchMs)+' ms'});
+    L.push({k:'Tempo médio (não-switch)', v:Math.round(r.avgNonSwitchMs)+' ms'});
+    L.push({k:'Eficiência espacial', v:r.spatialEfficiencyPct.toFixed(1)+'%'});
+
+    L.push({header:'Métricas temporais'});
+    L.push({k:'Tempo médio por conexão', v:Math.round(r.avgRtMs)+' ms'});
+    L.push({k:'RT mínimo', v:Math.round(r.minRtMs)+' ms'});
+    L.push({k:'RT máximo', v:Math.round(r.maxRtMs)+' ms'});
+    L.push({k:'Coeficiente de variação', v:r.cvPct.toFixed(1)+'%'});
+    L.push({k:'Índice de fadiga', v:(r.fatigueIndexPct>0?'+':'')+r.fatigueIndexPct.toFixed(1)+'%'});
+    L.push({k:'Velocidade inicial (1º terço)', v:Math.round(r.speedInitialMs)+' ms'});
+    L.push({k:'Velocidade média (2º terço)', v:Math.round(r.speedMiddleMs)+' ms'});
+    L.push({k:'Velocidade final (3º terço)', v:Math.round(r.speedFinalMs)+' ms'});
+
+    L.push({header:'Análise de erros'});
+    L.push({k:'Erros de categoria', v:num(r.errorTypes.category)});
+    L.push({k:'Erros de sequência', v:num(r.errorTypes.sequence)});
+    L.push({k:'Erros de regressão', v:num(r.errorTypes.regression)});
+    L.push({k:'Índice de perseveração', v:r.perseverationPct.toFixed(1)+'%'});
+    L.push({k:'Tempo até o 1º erro', v:r.firstErrorMs!=null?(r.firstErrorMs/1000).toFixed(2)+' s':'—'});
+
+    L.push({header:'Comparação normativa (Tombaugh 2004, Trail B)'});
+    const g = m.ageRange ? NORMATIVE_DATA_TMTB[m.ageRange] : null;
+    if(g && (m.education || !g.eduStratified)){
+      const cell = g.eduStratified ? g[m.education] : g.lo;
+      const z=(r.totalTimeMs/1000 - cell.mean)/cell.sd;
+      const pct=Math.round(100-this.zScoreToPercentile(z));
+      const cl=this.classifyPerformance(pct);
+      L.push({k:'Faixa etária', v:m.ageRange+' anos'});
+      L.push({k:'Escolaridade', v:g.eduStratified?(m.education==='lo'?'≤12 anos':'>12 anos'):'não estratificada (18–54)'});
+      L.push({k:'Norma (média ± DP)', v:cell.mean.toFixed(1)+' ± '+cell.sd.toFixed(1)+' s'});
+      L.push({k:'z-score', v:z.toFixed(2)});
+      L.push({k:'Percentil (modelo normal)', v:pct+'%'});
+      L.push({k:'Classificação normativa', v:cl.label});
+    } else {
+      L.push({k:'Status', v:'faixa etária/escolaridade não informadas no app'});
+    }
+
+    L.push({header:'Avaliação de validade'});
+    L.push({k:'Resultado', v:r.validity.valid?'Válido (sem sinalizadores)':'Validade comprometida'});
+    if(!r.validity.valid) r.validity.reasons.forEach((x,i)=>L.push({k:'Motivo '+(i+1), v:x}));
+
+    L.push({header:'Dados ambientais e do dispositivo'});
+    L.push({k:'Dispositivo', v:m.deviceType});
+    L.push({k:'Modalidade de ponteiro', v:m.pointerModality});
+    L.push({k:'Taxa de atualização', v:m.refreshRateHz?m.refreshRateHz+' Hz':'—'});
+    L.push({k:'Respostas < 150 ms', v:num(m.fastResponses)});
+    L.push({k:'Perdas de foco', v:num(m.focusLossCount)});
+    L.push({k:'Redimensionou a tela', v:m.resizeDuringTest?'Sim':'Não'});
+    L.push({k:'Forma (seed gerador)', v:m.formSeed!=null?num(m.formSeed):'—'});
+    L.push({k:'Seed (URL)', v:m.seed!=null?num(m.seed):'—'});
+
+    L.push({note:'Processamento 100% local (LGPD); nenhum dado enviado a servidores. Ferramenta de apoio — não substitui avaliação neuropsicológica nem normas locais. Percentil por modelo normal (z-score).'});
+    return L;
+  }
+
+  buildPDF(lines){
+    const PAGE_W=595, PAGE_H=842, MARGIN=50, BOTTOM=54;
+    const sanitize=s=>String(s)
+      .replace(/[–—]/g,'-').replace(/[•·]/g,'-').replace(/→/g,'->')
+      .replace(/…/g,'...').replace(/≤/g,'<=').replace(/≥/g,'>=')
+      .replace(/[“”]/g,'"').replace(/[‘’]/g,"'")
+      .replace(/[^\x09\x0a\x0d\x20-\xff]/g,''); // remove > 0xFF (emojis etc.)
+    const esc=s=>s.replace(/\\/g,'\\\\').replace(/\(/g,'\\(').replace(/\)/g,'\\)');
+    const wrap=(text,size,maxW)=>{
+      const maxChars=Math.max(8, Math.floor(maxW/(size*0.5)));
+      if(text.length<=maxChars) return [text];
+      const words=text.split(' '); const out=[]; let cur='';
+      for(const w of words){ if((cur+' '+w).trim().length>maxChars){ if(cur) out.push(cur); cur=w; } else cur=(cur?cur+' ':'')+w; }
+      if(cur) out.push(cur); return out;
+    };
+    const pages=[]; let cur=[]; let y=PAGE_H-MARGIN;
+    const flush=()=>{ if(cur.length){ pages.push(cur); cur=[]; } y=PAGE_H-MARGIN; };
+    const emit=(text,size,bold,indent)=>{
+      const x=MARGIN+(indent||0);
+      for(const ln of wrap(text,size,PAGE_W-MARGIN-x)){
+        if(y<BOTTOM) flush();
+        cur.push({x,y,size,bold,text:esc(sanitize(ln))});
+        y-=size*1.5;
+      }
+    };
+    for(const it of lines){
+      if(it.title){ emit(it.title,15,true,0); y-=4; }
+      else if(it.sub){ emit(it.sub,9,false,0); y-=6; }
+      else if(it.header){ y-=6; emit(it.header,12,true,0); y-=2; }
+      else if(it.note){ y-=8; emit(it.note,8,false,0); }
+      else { emit(it.k+': '+it.v,10.5,false,8); }
+    }
+    flush();
+
+    // Numeração: 1 Catalog, 2 Pages, 3 F1, 4 F2; depois (page,content) por página.
+    const pageIds=[], contentIds=[]; let n=5;
+    for(let p=0;p<pages.length;p++){ pageIds.push(n++); contentIds.push(n++); }
+    const parts=[];
+    parts.push({id:1, str:'<< /Type /Catalog /Pages 2 0 R >>'});
+    parts.push({id:2, str:`<< /Type /Pages /Kids [${pageIds.map(i=>i+' 0 R').join(' ')}] /Count ${pages.length} >>`});
+    parts.push({id:3, str:'<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>'});
+    parts.push({id:4, str:'<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>'});
+    for(let p=0;p<pages.length;p++){
+      parts.push({id:pageIds[p], str:`<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${PAGE_W} ${PAGE_H}] /Resources << /Font << /F1 3 0 R /F2 4 0 R >> >> /Contents ${contentIds[p]} 0 R >>`});
+      let cs='BT\n';
+      for(const ln of pages[p]) cs+=`/${ln.bold?'F2':'F1'} ${ln.size} Tf\n1 0 0 1 ${ln.x} ${ln.y.toFixed(1)} Tm\n(${ln.text}) Tj\n`;
+      cs+='ET';
+      parts.push({id:contentIds[p], str:`<< /Length ${cs.length} >>\nstream\n${cs}\nendstream`});
+    }
+    parts.sort((a,b)=>a.id-b.id);
+
+    const out=[]; const put=s=>{ for(let i=0;i<s.length;i++) out.push(s.charCodeAt(i)&0xFF); };
+    put('%PDF-1.4\n'); put('%\xE2\xE3\xCF\xD3\n');
+    const offs={};
+    for(const o of parts){ offs[o.id]=out.length; put(`${o.id} 0 obj\n`); put(o.str); put('\nendobj\n'); }
+    const xref=out.length, total=parts.length+1;
+    put(`xref\n0 ${total}\n0000000000 65535 f \n`);
+    for(let id=1;id<=parts.length;id++) put(`${String(offs[id]).padStart(10,'0')} 00000 n \n`);
+    put(`trailer\n<< /Size ${total} /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF`);
+    return new Uint8Array(out);
+  }
+
+  exportPDF(){
+    if(!this.results) return;
+    const bytes=this.buildPDF(this.buildReportLines());
+    this.download(new Blob([bytes],{type:'application/pdf'}), `TMTB_relatorio_${Date.now()}.pdf`);
   }
   saveLocal(){
     if(!this.results) return;
