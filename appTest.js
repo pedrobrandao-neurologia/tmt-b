@@ -119,6 +119,49 @@ function checkGeometry(app, label, minSepFloor) {
     ok('relatório expõe métricas da forma', !!a3.results.meta.formMetrics);
     ok('precisão < 100% (houve erro)', a3.results.accuracyPct < 100);
     ok('eficiência espacial calculada', a3.results.spatialEfficiencyPct > 0);
+    // métricas avançadas portadas do TMT-A
+    const r = a3.results;
+    ok('coef. de variação calculado', typeof r.cvPct === 'number' && r.cvPct >= 0);
+    ok('índice de fadiga calculado', typeof r.fatigueIndexPct === 'number');
+    ok('velocidade por terços presente', r.speedInitialMs >= 0 && r.speedFinalMs >= 0);
+    ok('RT mín ≤ RT máx', r.minRtMs <= r.maxRtMs);
+    ok('tempo até 1º erro registrado', r.firstErrorMs != null && r.firstErrorMs >= 0);
+    ok('captura ambiental (device/refresh)', !!r.meta.deviceType && 'refreshRateHz' in r.meta);
+    ok('switch cost ainda presente (B)', typeof r.switchCostMs === 'number');
+    ok('avaliação de validade presente', typeof r.validity.valid === 'boolean' && Array.isArray(r.validity.reasons));
+  }
+
+  console.log('\n== Validade / sinalizadores ==');
+  {
+    const d = await makeApp({}); const a = d.window.tmtbApp;
+    a.startTest();
+    a.state.fastResponses = 3; a.state.focusLossCount = 2; a.state.resizeDuringTest = true;
+    const v = a.computeValidity(25, 25, 5);
+    ok('detecta respostas rápidas', v.reasons.some(x => /150 ms/.test(x)));
+    ok('detecta perda de foco', v.reasons.some(x => /foco/.test(x)));
+    ok('detecta redimensionamento', v.reasons.some(x => /redimension/i.test(x)));
+    ok('resultado marcado inválido', v.valid === false);
+    const v2 = a.computeValidity(25, 25, 1);
+    a.state.fastResponses = 0; a.state.focusLossCount = 0; a.state.resizeDuringTest = false;
+    const v3 = a.computeValidity(25, 25, 1);
+    ok('sem sinalizadores → válido', v3.valid === true);
+  }
+
+  console.log('\n== Normas (Tombaugh 2004, idade + escolaridade) ==');
+  {
+    const d = await makeApp({}); const a = d.window.tmtbApp;
+    ok('11 faixas etárias na tabela', Object.keys(d.window.NORMATIVE_DATA_TMTB).length === 11);
+    ok('cada faixa tem lo (≤12) e hi (>12)', Object.values(d.window.NORMATIVE_DATA_TMTB).every(o => o.lo && o.hi && o.lo.mean && o.hi.mean));
+    ok('escolaridade maior → tempo esperado menor', Object.values(d.window.NORMATIVE_DATA_TMTB).every(o => o.hi.mean <= o.lo.mean));
+    // z-score → percentil: mediana ≈ 50%
+    ok('z=0 → ~50º percentil', Math.abs(a.zScoreToPercentile(0) - 50) < 1);
+    ok('z=+1 → ~84º percentil', Math.abs(a.zScoreToPercentile(1) - 84) < 2);
+    ok('classificação por percentil', a.classifyPerformance(99).label === 'Muito Superior' && a.classifyPerformance(1).label === 'Muito Baixo');
+    // tempo rápido (bom) num idoso pouco escolarizado → percentil alto
+    a.results = { totalTimeMs: 60000, meta: {} };
+    a.el.ageRes.value = '70-74'; a.el.eduRes.value = 'lo'; a.renderNorms();
+    ok('tabela de normas renderiza 11 linhas', a.el.normTable.querySelectorAll('tr').length === 11);
+    ok('linha da idade selecionada destacada', !!a.el.normTable.querySelector('tr.highlighted'));
   }
 
   console.log('\n== Reset ==');
