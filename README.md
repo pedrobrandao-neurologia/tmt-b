@@ -1,4 +1,4 @@
-# Trail Making Test B (TMT-B) — Versão 4.1.0
+# Trail Making Test B (TMT-B) — Versão 4.2.0
 
 Implementação digital do **Trail Making Test — Parte B (TMT-B)**, voltada à avaliação de **atenção alternada** e **flexibilidade cognitiva**, com registro detalhado de desempenho, categorização de erros e exportação de resultados em múltiplos formatos.
 
@@ -89,6 +89,21 @@ A digitalização do teste permite padronização, maior sensibilidade métrica 
 * O uso deve sempre ser acompanhado de interpretação clínica por profissional capacitado.
 
 ---
+
+## 🧩 Ajustes de dificuldade e relatório PDF (v4.2)
+
+- **Sem realce do próximo alvo.** O nó-alvo deixou de ser destacado/pulsante:
+  o examinando precisa **localizar o próximo item por conta própria**,
+  preservando o **custo de set-shifting / busca visual** (o realce reduzia
+  artificialmente a dificuldade). Durante a execução a arena já colapsa para
+  exibir apenas o cronômetro.
+- **Números e letras com a mesma cor.** Removida a distinção cromática
+  (antes azul/violeta): todos os nós usam o mesmo estilo neutro, aumentando o
+  custo de alternância e aproximando da forma **lápis-e-papel** (não colorida).
+- **Relatório em PDF** (além de CSV/JSON), com **todas as variáveis**. Gerado
+  por um **escritor de PDF embutido** (PDF 1.4, fontes Helvetica padrão,
+  paginação automática) — **sem bibliotecas externas**, download direto como
+  os demais formatos.
 
 ## 🎨 Estética e métricas avançadas (v4.1 — paridade com o TMT-A)
 

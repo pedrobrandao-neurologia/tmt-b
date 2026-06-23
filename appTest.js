@@ -170,6 +170,48 @@ function checkGeometry(app, label, minSepFloor) {
     ok('linha da idade selecionada destacada', !!a.el.normTable.querySelector('tr.highlighted'));
   }
 
+  console.log('\n== Sem realce do próximo alvo / cor uniforme ==');
+  {
+    const d = await makeApp({}); const a = d.window.tmtbApp;
+    a.startTest();
+    const hasTarget = () => a.state.nodes.some(n => n.node.classList.contains('target'));
+    ok('nenhum nó realçado ao iniciar', !hasTarget());
+    // simula execução parcial: nenhum realce deve aparecer
+    a.state.isRunning = true; a.state.start = d.window.performance.now();
+    const seq = a.state.seq;
+    for (let i = 0; i < 5; i++) { const n = a.state.nodes.find(nd => nd.item.v === seq[i].v && nd.item.t === seq[i].t); a.onClick(n.item, n.node); }
+    ok('nenhum nó realçado durante a execução', !hasTarget());
+    // número e letra usam as mesmas classes de estilo neutro (sem distinção cromática)
+    const aNum = a.state.nodes.find(n => n.item.t === 'number').node;
+    const aLet = a.state.nodes.find(n => n.item.t === 'letter').node;
+    ok('número e letra sem cor inline distinta', aNum.style.color === aLet.style.color);
+    ok('CSS não define mais regra .target', !/\.circle-node\.target\b/.test(fs.readFileSync('index.html', 'utf8')));
+  }
+
+  console.log('\n== Exportação PDF (todas as variáveis) ==');
+  {
+    const d = await makeApp({}); const a = d.window.tmtbApp;
+    a.startTest();
+    a.state.isRunning = true; a.state.start = d.window.performance.now();
+    const seq = a.state.seq;
+    for (let i = 0; i < seq.length; i++) { const n = a.state.nodes.find(nd => nd.item.v === seq[i].v && nd.item.t === seq[i].t); a.onClick(n.item, n.node); }
+    a.el.ageRes.value = '25-34'; // sem escolaridade (grupo não estratificado)
+    const lines = a.buildReportLines();
+    const headers = lines.filter(l => l.header).map(l => l.header);
+    ok('relatório tem todas as seções', ['Desempenho geral', 'Flexibilidade cognitiva (específico do TMT-B)', 'Métricas temporais', 'Análise de erros', 'Comparação normativa (Tombaugh 2004, Trail B)', 'Avaliação de validade', 'Dados ambientais e do dispositivo'].every(h => headers.includes(h)));
+    ok('relatório inclui CV e fadiga', lines.some(l => l.k === 'Coeficiente de variação') && lines.some(l => l.k === 'Índice de fadiga'));
+    const pdf = a.buildPDF(lines);
+    ok('buildPDF retorna Uint8Array', pdf instanceof d.window.Uint8Array || pdf.constructor.name === 'Uint8Array');
+    const head = String.fromCharCode(...pdf.slice(0, 8));
+    const tail = String.fromCharCode(...pdf.slice(-5));
+    ok('PDF começa com %PDF-1.4', head === '%PDF-1.4');
+    ok('PDF termina com %%EOF', tail === '%%EOF');
+    const txt = Array.from(pdf).map(b => String.fromCharCode(b)).join('');
+    ok('PDF tem xref e trailer', /\bxref\b/.test(txt) && /\btrailer\b/.test(txt) && /\/Root 1 0 R/.test(txt));
+    ok('PDF declara as fontes Helvetica', /Helvetica-Bold/.test(txt) && /WinAnsiEncoding/.test(txt));
+    ok('PDF tem tamanho plausível (> 800 bytes)', pdf.length > 800);
+  }
+
   console.log('\n== Reset ==');
   {
     const d4 = await makeApp({}); const a4 = d4.window.tmtbApp;
