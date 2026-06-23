@@ -3,10 +3,10 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover"/>
-<title>Trail Making Test B (TMT-B) — Versão 4.1.0</title>
+<title>Trail Making Test B (TMT-B) — Versão 4.1.1</title>
 <meta name="description" content="Implementação digital do TMT-B (atenção alternada / flexibilidade cognitiva) com gerador de formas paralelas, métricas avançadas, comparação normativa (Tombaugh 2004) e avaliação de validade. Processamento 100% local."/>
 <meta name="author" content="Laboratório de Neurociência Cognitiva"/>
-<meta name="version" content="4.1.0"/>
+<meta name="version" content="4.1.1"/>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -337,7 +337,7 @@ body{
       <div id="normResult" class="norm-note">Selecione faixa etária e escolaridade para ver z-score e percentil.</div>
       <table class="normative-table" id="normTable"><thead><tr><th>Faixa etária</th><th>Média (s)</th><th>DP</th><th>Seu z</th><th>Percentil</th></tr></thead><tbody></tbody></table>
       <div class="norm-note" id="normSourceNote">
-        ⚠️ <strong>Valores normativos a confirmar:</strong> a tabela embutida (Tombaugh, 2004, <em>Arch Clin Neuropsychol</em> 19:203–214) é uma reconstrução de melhor esforço, pois o PDF da fonte não pôde ser recuperado automaticamente. Verifique/substitua os valores em <code>NORMATIVE_DATA_TMTB</code> antes de uso clínico. Percentil estimado assumindo distribuição normal; tempos maiores = pior desempenho.
+        Fonte: <strong>Tombaugh (2004)</strong>, <em>Arch Clin Neuropsychol</em> 19:203–214 (Tabela 2 — Trail B, Média/DP em segundos). Os grupos <strong>18–54 anos não são estratificados por escolaridade</strong> na fonte (usa-se o total). Percentil estimado por <strong>modelo normal</strong> (z-score) — como as distribuições de tempo têm assimetria positiva, o percentil normal difere um pouco das tabelas percentílicas empíricas. Tempos maiores = pior desempenho.
       </div>
     </div>
 
@@ -411,24 +411,25 @@ const PRACTICE_FORM = {seed:1, points:[[0.54,0.35],[0.63,0.65],[0.145,0.78],[0.3
 const MIN_DIST_NORM = 0.11;
 
 /* =====================================================================
- * NORMATIVE_DATA_TMTB — Tombaugh (2004), TMT-B, tempo (s) por faixa etária
- * × escolaridade { lo: ≤12 anos, hi: >12 anos }. ⚠️ RECONSTRUÇÃO DE MELHOR
- * ESFORÇO: confirme/substitua pelos valores oficiais da tabela publicada
- * antes de uso clínico (o PDF da fonte não pôde ser obtido automaticamente).
- * Estrutura pronta para receber os números exatos sem mudar a lógica.
+ * NORMATIVE_DATA_TMTB — Tombaugh (2004), Trail B, tempo (s): Média (DP).
+ * Fonte: Tombaugh TN. "Trail Making Test A and B: normative data stratified
+ * by age and education." Arch Clin Neuropsychol 2004;19:203–214 (Tabela 2).
+ * Escolaridade { lo: 0–12 anos, hi: 12+ anos }. Os grupos 18–54 NÃO são
+ * estratificados por escolaridade na fonte (só há o total) — por isso
+ * lo = hi nesses grupos. `eduStratified:false` sinaliza esse caso na UI.
  * ===================================================================== */
 const NORMATIVE_DATA_TMTB = {
-  '18-24': { lo:{mean:48.0, sd:13.0}, hi:{mean:44.7, sd:11.6} },
-  '25-34': { lo:{mean:53.0, sd:15.0}, hi:{mean:48.0, sd:12.0} },
-  '35-44': { lo:{mean:60.0, sd:17.0}, hi:{mean:52.0, sd:13.0} },
-  '45-54': { lo:{mean:72.0, sd:22.0}, hi:{mean:58.0, sd:16.0} },
-  '55-59': { lo:{mean:78.8, sd:19.1}, hi:{mean:62.2, sd:17.0} },
-  '60-64': { lo:{mean:90.0, sd:24.0}, hi:{mean:68.1, sd:19.0} },
-  '65-69': { lo:{mean:109.0, sd:30.0}, hi:{mean:78.0, sd:20.0} },
-  '70-74': { lo:{mean:128.0, sd:35.0}, hi:{mean:87.0, sd:24.0} },
-  '75-79': { lo:{mean:154.0, sd:44.0}, hi:{mean:100.0, sd:28.0} },
-  '80-84': { lo:{mean:167.0, sd:52.0}, hi:{mean:118.0, sd:40.0} },
-  '85-89': { lo:{mean:222.0, sd:79.0}, hi:{mean:136.0, sd:48.0} }
+  '18-24': { eduStratified:false, lo:{mean:48.97, sd:12.69}, hi:{mean:48.97, sd:12.69} },
+  '25-34': { eduStratified:false, lo:{mean:50.68, sd:12.36}, hi:{mean:50.68, sd:12.36} },
+  '35-44': { eduStratified:false, lo:{mean:58.46, sd:16.41}, hi:{mean:58.46, sd:16.41} },
+  '45-54': { eduStratified:false, lo:{mean:63.76, sd:14.42}, hi:{mean:63.76, sd:14.42} },
+  '55-59': { eduStratified:true,  lo:{mean:78.84, sd:19.09}, hi:{mean:68.74, sd:21.02} },
+  '60-64': { eduStratified:true,  lo:{mean:74.55, sd:19.55}, hi:{mean:64.58, sd:18.59} },
+  '65-69': { eduStratified:true,  lo:{mean:91.32, sd:28.89}, hi:{mean:67.12, sd:9.31} },
+  '70-74': { eduStratified:true,  lo:{mean:109.95, sd:35.15}, hi:{mean:86.27, sd:24.07} },
+  '75-79': { eduStratified:true,  lo:{mean:130.61, sd:45.74}, hi:{mean:100.68, sd:44.16} },
+  '80-84': { eduStratified:true,  lo:{mean:152.74, sd:65.68}, hi:{mean:132.15, sd:42.95} },
+  '85-89': { eduStratified:true,  lo:{mean:167.69, sd:78.50}, hi:{mean:140.54, sd:75.38} }
 };
 
 /* ===== Teste TMT-B ===== */
@@ -861,14 +862,17 @@ class TMTB {
       tr.innerHTML=`<td>${g}</td><td>${cell.mean.toFixed(1)}</td><td>${cell.sd.toFixed(1)}</td><td>${(g===age)?z.toFixed(2):'–'}</td><td>${(g===age)?percentile+'%':'–'}</td>`;
       tbody.appendChild(tr);
     });
-    if(age && edu){
-      const cell=NORMATIVE_DATA_TMTB[age][edu];
+    const group = age ? NORMATIVE_DATA_TMTB[age] : null;
+    const needEdu = group ? group.eduStratified : true;
+    if(age && (edu || !needEdu)){
+      const cell = !needEdu ? group.lo : group[edu];
       const z=(timeSec-cell.mean)/cell.sd;
       const percentile=Math.round(100-this.zScoreToPercentile(z));
       const cl=this.classifyPerformance(percentile);
-      this.el.normResult.innerHTML=`Seu tempo: <strong>${timeSec.toFixed(1)} s</strong> · z = <strong>${z.toFixed(2)}</strong> · percentil <strong>${percentile}%</strong> <span class="performance-badge ${cl.badge}">${cl.label}</span>`;
+      const eduTag = needEdu ? '' : ' <span style="color:var(--text-dim);font-weight:400">(faixa não estratificada por escolaridade)</span>';
+      this.el.normResult.innerHTML=`Seu tempo: <strong>${timeSec.toFixed(1)} s</strong> · z = <strong>${z.toFixed(2)}</strong> · percentil <strong>${percentile}%</strong> <span class="performance-badge ${cl.badge}">${cl.label}</span>${eduTag}`;
     } else {
-      this.el.normResult.textContent='Selecione faixa etária e escolaridade para ver z-score e percentil.';
+      this.el.normResult.textContent = age ? 'Selecione a escolaridade para ver z-score e percentil.' : 'Selecione faixa etária e escolaridade para ver z-score e percentil.';
     }
   }
 

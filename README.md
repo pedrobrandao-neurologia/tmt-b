@@ -120,13 +120,13 @@ alternância, eficiência espacial, tipificação de erros, perseveração):
 - **Persistência local opcional** (`localStorage`, com aviso LGPD) e exportação
   CSV/JSON/LOG.
 
-> ⚠️ **Valores normativos a confirmar.** A tabela `NORMATIVE_DATA_TMTB`
-> (Tombaugh, 2004, *Arch Clin Neuropsychol* 19:203–214) é uma **reconstrução de
-> melhor esforço** — o PDF da fonte não pôde ser recuperado automaticamente.
-> Os números são facilmente substituíveis num único bloco no `index.html`;
-> **verifique-os contra a fonte primária antes de uso clínico.** A engenharia
-> (z-score, percentil, classificação, tabela destacada) está correta e
-> independe dos valores exatos.
+> **Normas oficiais embutidas.** A tabela `NORMATIVE_DATA_TMTB` traz os valores
+> **Média (DP) do Trail B** de **Tombaugh (2004)**, *Arch Clin Neuropsychol*
+> 19:203–214 (Tabela 2). Os grupos **18–54 anos não são estratificados por
+> escolaridade** na fonte (usa-se o total). O percentil é estimado por **modelo
+> normal** (z-score, como no TMT-A); por causa da assimetria positiva das
+> distribuições de tempo, ele difere ligeiramente das tabelas percentílicas
+> empíricas (Tabela 3 do artigo).
 
 ---
 

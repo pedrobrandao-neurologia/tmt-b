@@ -150,9 +150,15 @@ function checkGeometry(app, label, minSepFloor) {
   console.log('\n== Normas (Tombaugh 2004, idade + escolaridade) ==');
   {
     const d = await makeApp({}); const a = d.window.tmtbApp;
-    ok('11 faixas etárias na tabela', Object.keys(d.window.NORMATIVE_DATA_TMTB).length === 11);
-    ok('cada faixa tem lo (≤12) e hi (>12)', Object.values(d.window.NORMATIVE_DATA_TMTB).every(o => o.lo && o.hi && o.lo.mean && o.hi.mean));
-    ok('escolaridade maior → tempo esperado menor', Object.values(d.window.NORMATIVE_DATA_TMTB).every(o => o.hi.mean <= o.lo.mean));
+    const ND = d.window.NORMATIVE_DATA_TMTB;
+    ok('11 faixas etárias na tabela', Object.keys(ND).length === 11);
+    ok('cada faixa tem lo (≤12) e hi (>12)', Object.values(ND).every(o => o.lo && o.hi && o.lo.mean && o.hi.mean));
+    ok('escolaridade maior → tempo esperado menor', Object.values(ND).every(o => o.hi.mean <= o.lo.mean));
+    // valores oficiais Tombaugh (2004), Trail B
+    ok('18-24 = 48.97 (12.69), não-estratificado', ND['18-24'].lo.mean === 48.97 && ND['18-24'].lo.sd === 12.69 && ND['18-24'].eduStratified === false && ND['18-24'].lo.mean === ND['18-24'].hi.mean);
+    ok('55-59 lo/hi = 78.84/68.74, estratificado', ND['55-59'].lo.mean === 78.84 && ND['55-59'].hi.mean === 68.74 && ND['55-59'].eduStratified === true);
+    ok('65-69 hi = 67.12 (9.31)', ND['65-69'].hi.mean === 67.12 && ND['65-69'].hi.sd === 9.31);
+    ok('85-89 lo = 167.69 (78.50)', ND['85-89'].lo.mean === 167.69 && ND['85-89'].lo.sd === 78.50);
     // z-score → percentil: mediana ≈ 50%
     ok('z=0 → ~50º percentil', Math.abs(a.zScoreToPercentile(0) - 50) < 1);
     ok('z=+1 → ~84º percentil', Math.abs(a.zScoreToPercentile(1) - 84) < 2);
