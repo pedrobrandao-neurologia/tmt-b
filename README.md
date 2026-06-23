@@ -1,4 +1,4 @@
-# Trail Making Test B (TMT-B) — Versão 4.0.0
+# Trail Making Test B (TMT-B) — Versão 4.1.0
 
 Implementação digital do **Trail Making Test — Parte B (TMT-B)**, voltada à avaliação de **atenção alternada** e **flexibilidade cognitiva**, com registro detalhado de desempenho, categorização de erros e exportação de resultados em múltiplos formatos.
 
@@ -87,6 +87,46 @@ A digitalização do teste permite padronização, maior sensibilidade métrica 
 * O tempo máximo de execução é limitado a **5 minutos**, em conformidade com protocolos clínicos usuais.
 * A classificação de desempenho implementada é **heurística** e **não substitui normas estratificadas** por idade e escolaridade.
 * O uso deve sempre ser acompanhado de interpretação clínica por profissional capacitado.
+
+---
+
+## 🎨 Estética e métricas avançadas (v4.1 — paridade com o TMT-A)
+
+A v4.1 alinha o TMT-B ao repositório do **TMT-A**, tanto no visual quanto nas
+variáveis quantificadas.
+
+**Estética (tema escuro moderno):** fundo preto, painéis `#0b0f17`, acento azul
+`#3b82f6`, fonte **Inter**, dimensionamento responsivo com `clamp()`, **arena
+quadrada 1:1**, HUD que **colapsa para apenas o cronômetro** durante o teste, e
+barra de ferramentas com **tema claro/escuro, som, pausa e tela cheia**. Os nós
+distinguem **número (azul)** de **letra (violeta)** para reforçar a alternância.
+
+**Relatório enriquecido** (além das métricas próprias do B — custo de
+alternância, eficiência espacial, tipificação de erros, perseveração):
+
+- **Métricas temporais:** tempo médio por conexão, RT mín/máx, **coeficiente de
+  variação (%)**;
+- **Análise de velocidade:** velocidade por terços (inicial/médio/final) e
+  **índice de fadiga (%)**;
+- **Tempo até o primeiro erro**;
+- **Dados ambientais:** tipo de dispositivo, modalidade de ponteiro
+  (mouse/touch/pen), **taxa de atualização (Hz)**, **respostas < 150 ms**,
+  **perdas de foco** da janela e **redimensionamento** da tela durante o teste;
+- **Comparação normativa (Tombaugh, 2004)** estratificada por **idade ×
+  escolaridade** (≤12 / >12 anos), com **z-score**, **percentil** (via função
+  erro de Abramowitz–Stegun) e classificação;
+- **Avaliação de validade:** sinalizadores (teste incompleto, respostas
+  implausíveis, perda de foco, redimensionamento, taxa de erro elevada);
+- **Persistência local opcional** (`localStorage`, com aviso LGPD) e exportação
+  CSV/JSON/LOG.
+
+> **Normas oficiais embutidas.** A tabela `NORMATIVE_DATA_TMTB` traz os valores
+> **Média (DP) do Trail B** de **Tombaugh (2004)**, *Arch Clin Neuropsychol*
+> 19:203–214 (Tabela 2). Os grupos **18–54 anos não são estratificados por
+> escolaridade** na fonte (usa-se o total). O percentil é estimado por **modelo
+> normal** (z-score, como no TMT-A); por causa da assimetria positiva das
+> distribuições de tempo, ele difere ligeiramente das tabelas percentílicas
+> empíricas (Tabela 3 do artigo).
 
 ---
 
