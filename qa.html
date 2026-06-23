@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>QA — Equivalência de Formas TMT-B</title>
+<style>
+  :root{--num:#2196F3;--let:#8BC34A;--ok:#2e7d32;--bad:#c62828;--line:#e0e0e0}
+  *{box-sizing:border-box} body{font-family:system-ui,Segoe UI,Roboto,sans-serif;margin:0;padding:1.2rem;background:#f4f6f9;color:#212121}
+  h1{font-size:1.4rem;margin:0 0 .3rem} p.sub{color:#666;margin:0 0 1rem}
+  .controls{display:flex;gap:.6rem;flex-wrap:wrap;align-items:center;margin-bottom:1rem;background:#fff;border:1px solid var(--line);border-radius:10px;padding:.8rem}
+  label{font-size:.85rem;color:#444} input{width:70px;padding:.3rem;border:1px solid var(--line);border-radius:6px}
+  button{padding:.5rem .9rem;border:0;border-radius:8px;background:#673AB7;color:#fff;font-weight:700;cursor:pointer}
+  button.sec{background:#fff;color:#673AB7;border:2px solid #673AB7}
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:1rem}
+  .card{background:#fff;border:1px solid var(--line);border-radius:12px;padding:.8rem;box-shadow:0 2px 6px rgba(0,0,0,.06)}
+  .card h3{margin:.1rem 0 .5rem;font-size:1rem;display:flex;justify-content:space-between;align-items:center}
+  .badge{font-size:.72rem;font-weight:800;padding:.15rem .5rem;border-radius:999px;color:#fff}
+  .badge.ok{background:var(--ok)} .badge.bad{background:var(--bad)} .badge.ref{background:#455a64}
+  svg{width:100%;height:auto;border:1px solid var(--line);border-radius:8px;background:#fafafa}
+  table{width:100%;border-collapse:collapse;font-size:.74rem;margin-top:.5rem}
+  td{padding:.12rem .25rem;border-bottom:1px solid #f0f0f0} td:last-child{text-align:right;font-variant-numeric:tabular-nums}
+  td.fail{color:var(--bad);font-weight:700} td.pass{color:var(--ok)}
+  .num{fill:#E3F2FD;stroke:var(--num)} .let{fill:#F1F8E9;stroke:var(--let)}
+  .lbl{font-size:9px;font-weight:700;text-anchor:middle;dominant-baseline:central}
+</style>
+</head>
+<body>
+  <h1>QA — Equivalência de Formas Paralelas (TMT-B)</h1>
+  <p class="sub">Render lado a lado da forma de referência (original) + N formas geradas, com métricas e selo de equivalência. Tudo offline.</p>
+
+  <div class="controls">
+    <label>Seed inicial <input id="seedStart" type="number" value="1"></label>
+    <label>Nº de formas <input id="count" type="number" value="6"></label>
+    <button id="gen">Gerar / Atualizar</button>
+    <button class="sec" id="csv">Exportar CSV</button>
+    <button class="sec" id="json">Exportar JSON</button>
+    <span id="status" style="color:#666;font-size:.85rem"></span>
+  </div>
+
+  <div class="grid" id="grid"></div>
+
+<script src="layoutGenerator.js"></script>
+<script>
+const G = window.TMTBLayout;
+let lastSet = null;
+
+function pf(delta, tol){ return delta <= tol; }
+
+function svgFor(points, labeled){
+  const S = 280, R = 11;
+  let circles = '';
+  // trilha
+  let path = 'M ' + points.map(p => `${(p.x*S).toFixed(1)} ${(p.y*S).toFixed(1)}`).join(' L ');
+  for(let i=0;i<points.length;i++){
+    const x=points[i].x*S, y=points[i].y*S;
+    const it = labeled ? labeled[i] : {v:String(i+1), t:'number'};
+    circles += `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${R}" class="${it.t==='number'?'num':'let'}" stroke-width="2"/>`+
+               `<text x="${x.toFixed(1)}" y="${y.toFixed(1)}" class="lbl">${it.v}</text>`;
+  }
+  return `<svg viewBox="0 0 ${S} ${S}"><path d="${path}" fill="none" stroke="#9e9e9e" stroke-width="1.5" opacity=".7"/>${circles}</svg>`;
+}
+
+function row(label, val, ref, delta, tol, unit=''){
+  const cls = (delta==null)?'' : (pf(delta,tol)?'pass':'fail');
+  const d = (delta==null)?'' : ` (Δ ${typeof delta==='number'?delta.toFixed(2):delta})`;
+  return `<tr><td>${label}</td><td class="${cls}">${val}${unit}${d}</td></tr>`;
+}
+
+function card(title, badgeClass, badgeText, svg, metricsRows){
+  return `<div class="card"><h3>${title}<span class="badge ${badgeClass}">${badgeText}</span></h3>${svg}<table>${metricsRows}</table></div>`;
+}
+
+function metricsTable(m, ref, tol, deltas){
+  return [
+    row('Comprimento', m.pathLength, ref?ref.pathLength:null, deltas?deltas.pathLength:null, tol.pathLengthPct),
+    row('Passo médio', m.meanStep, ref?ref.meanStep:null, deltas?deltas.meanStep:null, tol.meanStepPct),
+    row('Desvio passo', m.sdStep, ref?ref.sdStep:null, deltas?deltas.sdStep:null, tol.sdStepPct),
+    row('Cruzamentos', m.crossings, 0, deltas?deltas.crossings:null, 0),
+    row('Hull %', m.hullPct, ref?ref.hullPct:null, deltas?deltas.hullPct:null, tol.hullPctAbs*100,'%'),
+    row('Near (R.20)', m.nearKey, ref?ref.nearKey:null, deltas?deltas.nearKey:null, tol.nearKeyAbs),
+    row('Virada média', m.meanTurn, ref?ref.meanTurn:null, deltas?deltas.meanTurn:null, tol.meanTurnAbs,'°'),
+    row('minPair', m.minPair, null, null, 0)
+  ].join('');
+}
+
+function render(){
+  const seedStart = parseInt(document.getElementById('seedStart').value,10)||1;
+  const count = parseInt(document.getElementById('count').value,10)||6;
+  document.getElementById('status').textContent = 'Gerando…';
+  const set = G.generateEquivalentSet({ count, seedStart });
+  lastSet = set;
+  const ref = set.reference.metrics, tol = set.tolerances;
+  const grid = document.getElementById('grid');
+  let html = card('Referência (original)', 'ref', 'REF', svgFor(set.reference.points, set.reference.points), metricsTable(ref, null, tol, null));
+  for(const f of set.forms){
+    const eq = G.isEquivalent(f.metrics, ref, tol);
+    html += card(`Forma seed ${f.seed}`, eq.equivalent?'ok':'bad', eq.equivalent?'EQUIVALENTE':'FORA', svgFor(f.points, f.labeled), metricsTable(f.metrics, ref, tol, f.deltas));
+  }
+  grid.innerHTML = html;
+  document.getElementById('status').textContent = `${set.forms.length} formas (varreu ${set.scanned} seeds). Referência: hull ${ref.hullPct}%, passo ${ref.meanStep}, virada ${ref.meanTurn}°.`;
+}
+
+function dl(name, text, type){ const b=new Blob([text],{type}); const u=URL.createObjectURL(b); const a=document.createElement('a'); a.href=u;a.download=name;a.click();URL.revokeObjectURL(u); }
+document.getElementById('gen').onclick = render;
+document.getElementById('csv').onclick = ()=> lastSet && dl('tmtb_qa.csv', G.toCSV(lastSet),'text/csv');
+document.getElementById('json').onclick = ()=> lastSet && dl('tmtb_qa.json', G.toJSON(lastSet),'application/json');
+render();
+</script>
+</body>
+</html>
