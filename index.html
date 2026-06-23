@@ -3,10 +3,10 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>Trail Making Test B (TMT-B) — Versão 3.3.1</title>
-<meta name="description" content="Implementação digital do TMT-B para avaliação de flexibilidade cognitiva e atenção alternada, com registro completo e exportação de dados."/>
+<title>Trail Making Test B (TMT-B) — Versão 4.0.0</title>
+<meta name="description" content="Implementação digital do TMT-B para avaliação de flexibilidade cognitiva e atenção alternada, com gerador de formas paralelas geometricamente equivalentes, registro completo e exportação de dados."/>
 <meta name="author" content="Laboratório de Neurociência Cognitiva"/>
-<meta name="version" content="3.3.1"/>
+<meta name="version" content="4.0.0"/>
 
 <style>
 :root{
@@ -220,6 +220,38 @@ function getSeed(){
   return isNaN(n) ? null : n;
 }
 
+/* =====================================================================
+ * BANCO DE FORMAS PARALELAS (congelado, gerado por layoutGenerator.js)
+ * ---------------------------------------------------------------------
+ * Coordenadas normalizadas [0,1] em ordem de caminho (1→A→2→B→…→12→L→13),
+ * geometricamente equivalentes à forma original do TMT-B (mesmo comprimento
+ * de trilha, hull, near-distractors e distribuição angular, dentro de
+ * tolerâncias) e com 0 cruzamentos / 0 sobreposições (minPair ≥ 0.11).
+ * Cada forma traz seu seed gerador para rastreabilidade/reprodutibilidade.
+ * Para regenerar: `node layoutGenerator.js --count 6 --seedStart 1`.
+ * ===================================================================== */
+const FORM_BANK = [
+  {seed:26, points:[[0.505,0.575],[0.36,0.62],[0.13,0.25],[0.365,0.825],[0.49,0.91],[0.925,0.935],[0.745,0.68],[0.52,0.785],[0.815,0.46],[0.47,0.31],[0.56,0.19],[0.295,0.36],[0.24,0.22],[0.735,0.155],[0.365,0.21],[0.92,0.13],[0.3,0.08],[0.485,0.065],[0.735,0.04],[0.175,0.04],[0.08,0.405],[0.11,0.655],[0.235,0.94],[0.22,0.505],[0.19,0.815]]},
+  {seed:33, points:[[0.515,0.57],[0.62,0.725],[0.17,0.3],[0.23,0.915],[0.205,0.665],[0.08,0.38],[0.2,0.8],[0.065,0.52],[0.05,0.705],[0.045,0.89],[0.35,0.96],[0.37,0.585],[0.52,0.93],[0.805,0.805],[0.605,0.28],[0.905,0.19],[0.285,0.24],[0.42,0.45],[0.15,0.105],[0.77,0.135],[0.46,0.08],[0.61,0.095],[0.855,0.045],[0.295,0.04],[0.045,0.065]]},
+  {seed:190, points:[[0.5,0.525],[0.91,0.375],[0.6,0.36],[0.35,0.385],[0.5,0.275],[0.2,0.355],[0.515,0.05],[0.725,0.285],[0.785,0.04],[0.935,0.15],[0.96,0.71],[0.345,0.615],[0.71,0.705],[0.53,0.88],[0.7,0.955],[0.345,0.84],[0.05,0.94],[0.085,0.44],[0.225,0.855],[0.14,0.555],[0.14,0.055],[0.205,0.23],[0.175,0.665],[0.74,0.41],[0.255,0.54]]},
+  {seed:210, points:[[0.635,0.415],[0.63,0.165],[0.855,0.465],[0.32,0.64],[0.145,0.17],[0.28,0.45],[0.505,0.235],[0.235,0.08],[0.42,0.105],[0.915,0.19],[0.925,0.04],[0.895,0.66],[0.65,0.6],[0.83,0.855],[0.455,0.63],[0.165,0.955],[0.05,0.345],[0.145,0.505],[0.165,0.69],[0.24,0.86],[0.19,0.365],[0.115,0.06],[0.045,0.235],[0.045,0.855],[0.045,0.67]]},
+  {seed:223, points:[[0.535,0.605],[0.1,0.56],[0.31,0.695],[0.745,0.725],[0.185,0.73],[0.62,0.77],[0.255,0.85],[0.05,0.71],[0.06,0.895],[0.495,0.85],[0.955,0.65],[0.75,0.89],[0.615,0.955],[0.305,0.95],[0.455,0.96],[0.89,0.95],[0.955,0.775],[0.96,0.215],[0.36,0.065],[0.125,0.145],[0.215,0.265],[0.715,0.52],[0.46,0.165],[0.835,0.185],[0.745,0.305]]},
+  {seed:229, points:[[0.515,0.635],[0.21,0.71],[0.29,0.88],[0.635,0.61],[0.17,0.295],[0.53,0.405],[0.08,0.185],[0.515,0.24],[0.855,0.4],[0.545,0.09],[0.955,0.245],[0.795,0.655],[0.505,0.77],[0.88,0.74],[0.74,0.795],[0.14,0.955],[0.51,0.905],[0.885,0.935],[0.91,0.5],[0.95,0.645],[0.96,0.085],[0.72,0.145],[0.83,0.04],[0.21,0.045],[0.36,0.07]]}
+];
+/* Métricas congeladas (rastreabilidade; espelham forms.generated.json). */
+const FORM_META = [
+  {seed:26,pathLength:8.5261,meanStep:0.3553,sdStep:0.1459,crossings:0,hullPct:70.05,nearKey:2.56,meanTurn:68.3,minPair:0.114},
+  {seed:33,pathLength:8.8132,meanStep:0.3672,sdStep:0.1525,crossings:0,hullPct:69.7,nearKey:2.32,meanTurn:61.12,minPair:0.1124},
+  {seed:190,pathLength:8.8626,meanStep:0.3693,sdStep:0.1333,crossings:0,hullPct:73.89,nearKey:2.16,meanTurn:64.26,minPair:0.1154},
+  {seed:210,pathLength:8.5039,meanStep:0.3543,sdStep:0.1548,crossings:0,hullPct:71.93,nearKey:2.48,meanTurn:71.92,minPair:0.1101},
+  {seed:223,pathLength:8.5142,meanStep:0.3548,sdStep:0.1473,crossings:0,hullPct:71.05,nearKey:2.16,meanTurn:88.6,minPair:0.1118},
+  {seed:229,pathLength:9.037,meanStep:0.3765,sdStep:0.1427,crossings:0,hullPct:74.38,nearKey:2.08,meanTurn:59.36,minPair:0.1141}
+];
+/* Forma de aquecimento (8 itens: 1–A…4–D), não-cruzante, sem sobreposição. */
+const PRACTICE_FORM = {seed:1, points:[[0.54,0.35],[0.63,0.65],[0.145,0.78],[0.36,0.65],[0.445,0.22],[0.73,0.09],[0.295,0.1],[0.045,0.135]]};
+/* Distância mínima normalizada usada na geração (= diâmetro do círculo). */
+const MIN_DIST_NORM = 0.11;
+
 /* ===== Teste TMT-B ===== */
 class TMTB {
   constructor(){
@@ -290,7 +322,8 @@ class TMTB {
       phase:'instructions', isPractice:false, isRunning:false,
       seq:[], current:0, start:0, end:0,
       nodes:[], pos:[], clicks:[], errors:[], totalDist:0, optimalDist:0,
-      seed: getSeed(), rng: null
+      seed: getSeed(), rng: null,
+      formIndex:0, formSeed:null, formMeta:null
     };
     this.state.rng = this.state.seed!=null ? seededRand(this.state.seed) : Math.random;
 
@@ -345,6 +378,15 @@ class TMTB {
     this.state.isPractice = false;
     this.state.phase='test';
     this.state.seq = this.seqFull;
+    // Seleção da forma do banco: com seed na URL → forma determinística;
+    // sem seed → cicla as formas a cada teste principal.
+    if(this.state.seed != null){
+      this.state.formIndex = ((this.state.seed % FORM_BANK.length) + FORM_BANK.length) % FORM_BANK.length;
+    } else {
+      this._run = (this._run || 0);
+      this.state.formIndex = this._run % FORM_BANK.length;
+      this._run++;
+    }
     this.el.btnStart.style.display='none';
     this.message('Teste principal: prepare-se…','info');
     if(this.placeNodes()){
@@ -367,84 +409,78 @@ class TMTB {
   }
 
   /**
-   * BUGFIX-1: Refatoração da função placeNodes
-   * A versão original usava uma chamada recursiva (this.placeNodes()) para tentar novamente
-   * a distribuição dos alvos em caso de falha. Isso podia levar a um estouro de pilha
-   * (stack overflow) e travar o navegador se a tela fosse pequena demais para os alvos,
-   * impedindo o início do teste.
-   *
-   * A nova versão usa um loop 'while' para tentar a distribuição completa por até 10 vezes.
-   * Se falhar, exibe uma mensagem de erro clara para o usuário sem travar.
-   * Isso torna o início do teste muito mais robusto e confiável.
+   * placeNodes() — v4.0: posicionamento a partir do BANCO DE FORMAS PARALELAS.
+   * Em vez de sorteio ingênuo (que não controlava cruzamento, hull, passo,
+   * near-distractors nem distribuição angular), usa uma forma pré-vetada e
+   * congelada — geometricamente equivalente ao original e intercambiável entre
+   * reaplicações. A geometria (coords normalizadas, ordem de caminho) é mapeada
+   * para a arena escalando cada eixo, e o tamanho do nó é ajustado dinamicamente
+   * para que centros a 0.11 (MIN_DIST_NORM) nunca colidam — garantindo
+   * não-sobreposição mesmo em telas pequenas (toque).
    */
   placeNodes() {
     const r = this.el.stage.getBoundingClientRect();
-    const W = r.width, H = r.height, M = this.cfg.MARGIN;
-    
-    let globalTries = 0;
-    const MAX_GLOBAL_TRIES = 10;
-    
-    while (globalTries < MAX_GLOBAL_TRIES) {
-      this.clearStage();
-      this.state.nodes = [];
-      this.state.pos = [];
-      this.state.current = 0;
-      this.state.totalDist = 0;
+    const W = r.width, H = r.height;
 
-      let allNodesPlaced = true;
-      let min_dist = this.cfg.MIN_DIST;
-
-      for (const item of this.state.seq) {
-        let attempts = 0, x = 0, y = 0, isOk = false;
-        
-        while (attempts < 200) {
-          x = M + this.state.rng() * (W - 2 * M);
-          y = M + this.state.rng() * (H - 2 * M);
-          if (this.state.pos.every(p => Math.hypot(x - p.x, y - p.y) >= min_dist)) {
-            isOk = true;
-            break;
-          }
-          attempts++;
-          // A cada 60 tentativas, reduz um pouco a distância para facilitar o encaixe
-          if (attempts % 60 === 0) min_dist = Math.max(48, min_dist - 6);
-        }
-
-        if (!isOk) {
-          allNodesPlaced = false;
-          break; // Falhou em posicionar este alvo, quebra o loop 'for'
-        }
-
-        this.state.pos.push({ x, y, item });
-      }
-
-      if (allNodesPlaced) {
-        // Sucesso! Posiciona os nós no DOM e sai do loop 'while'
-        this.state.pos.forEach(p => {
-          const node = this.makeNode({ x: p.x, y: p.y, item: p.item });
-          this.el.stage.appendChild(node);
-          this.state.nodes.push({ node, item: p.item });
-        });
-        
-        this.computeOptimalDistance();
-        this.highlightTarget();
-        return true; // Retorna sucesso
-      }
-      
-      globalTries++;
+    // Seleção da forma: aquecimento usa PRACTICE_FORM; teste cicla o banco.
+    let form;
+    if (this.state.isPractice) {
+      form = PRACTICE_FORM;
+    } else {
+      const idx = this.state.formIndex % FORM_BANK.length;
+      form = FORM_BANK[idx];
     }
-    
-    // Se o loop terminar sem sucesso
-    console.error(`Falha ao distribuir os alvos após ${MAX_GLOBAL_TRIES} tentativas.`);
-    this.message("Erro: Não foi possível gerar o teste. A tela pode ser pequena demais. Tente usar uma tela maior ou recarregar a página.", "err");
-    return false; // Retorna falha
+    this.state.formSeed = form.seed;
+    this.state.formMeta = this.state.isPractice ? null : (FORM_META[this.state.formIndex % FORM_BANK.length] || null);
+
+    const pts = form.points;
+    if (!pts || pts.length !== this.state.seq.length) {
+      console.error('Forma incompatível com a sequência.', pts && pts.length, this.state.seq.length);
+      this.message('Erro interno ao montar o teste. Recarregue a página.', 'err');
+      return false;
+    }
+
+    // Mapeamento normalizado → arena (eixos independentes), com 5% de margem.
+    const padFrac = 0.05;
+    const Sx = W * (1 - 2 * padFrac), Sy = H * (1 - 2 * padFrac);
+    const offX = W * padFrac, offY = H * padFrac;
+
+    // Tamanho do nó: nunca maior que a separação mínima projetada (no eixo mais
+    // estreito), com piso de toque (26px) e teto fixo (52px). Não relê o --circle
+    // já mutado, evitando "ratchet" entre execuções/reflows.
+    const minSepPx = MIN_DIST_NORM * Math.min(Sx, Sy);
+    const circleD = Math.max(26, Math.min(52, Math.floor(minSepPx * 0.9)));
+    document.documentElement.style.setProperty('--circle', circleD + 'px');
+
+    this.clearStage();
+    this.state.nodes = [];
+    this.state.pos = [];
+    this.state.current = 0;
+    this.state.totalDist = 0;
+
+    this.state.seq.forEach((item, i) => {
+      const x = offX + pts[i][0] * Sx;
+      const y = offY + pts[i][1] * Sy;
+      this.state.pos.push({ x, y, item });
+      const node = this.makeNode({ x, y, item, d: circleD });
+      this.el.stage.appendChild(node);
+      this.state.nodes.push({ node, item });
+    });
+
+    this.computeOptimalDistance();
+    this.highlightTarget();
+    return true;
   }
 
-  makeNode({x,y,item}){
+  makeNode({x,y,item,d:diam}){
     const d = document.createElement('div');
     d.className = `node ${item.t}`;
     d.tabIndex = 0;
     d.textContent = item.v;
-    const R = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--circle'))||52;
+    const R = diam || parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--circle'))||52;
+    d.style.width = `${R}px`;
+    d.style.height = `${R}px`;
+    d.style.fontSize = `${Math.max(11, Math.round(R*0.42))}px`;
     d.style.left = `${x - R/2}px`;
     d.style.top  = `${y - R/2}px`;
     d.setAttribute('role','button');
@@ -621,6 +657,9 @@ class TMTB {
       version: document.querySelector('meta[name="version"]')?.content || 'NA',
       practice: this.state.isPractice,
       seed: this.state.seed ?? null,
+      formSeed: this.state.formSeed ?? null,      // seed gerador da forma do banco
+      formIndex: this.state.formIndex ?? null,
+      formMetrics: this.state.formMeta ?? null,   // métricas congeladas da forma
       devicePixelRatio: window.devicePixelRatio||1,
       ua: navigator.userAgent,
       screen: {w:window.innerWidth,h:window.innerHeight}
@@ -714,6 +753,8 @@ class TMTB {
       `Indice_perseveracao_pct,${r.perseverationPct.toFixed(3)}`,
       `Pratica,${this.state.isPractice?1:0}`,
       `Seed,${this.state.seed??''}`,
+      `Forma_seed,${this.state.formSeed??''}`,
+      `Forma_indice,${this.state.formIndex??''}`,
       `Versao,${document.querySelector('meta[name="version"]')?.content||''}`
     ];
     const blob = new Blob([lines.join('\n')], {type:'text/csv;charset=utf-8;'});
@@ -741,6 +782,8 @@ class TMTB {
 /* ===== Inicialização ===== */
 document.addEventListener('DOMContentLoaded', ()=>{
   const app = new TMTB();
+  window.tmtbApp = app; // exposto para QA/testes (não usado pela UI)
+  window.FORM_BANK = FORM_BANK; window.FORM_META = FORM_META; window.PRACTICE_FORM = PRACTICE_FORM;
 
   // acessibilidade: fechar modal com ESC
   window.addEventListener('keydown', (e)=>{
